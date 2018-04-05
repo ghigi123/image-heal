@@ -3,9 +3,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import datasets, transforms
+from torchvision import datasets, transforms, models
 from torch.autograd import Variable
 import torch.utils.model_zoo as model_zoo
+import torchvision.utils as vutils
+
+import os
+data_path = os.path.abspath("data/faces/raw")
 
 model_urls = {
     'alexnet': 'https://download.pytorch.org/models/alexnet-owt-4df8aa71.pth',
@@ -19,6 +23,7 @@ parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
 parser.add_argument('--epochs', type=int, default=10, metavar='N',
                     help='number of epochs to train (default: 10)')
+parser.add_argument('--output-dir', default='./out', help='folder to output images and model checkpoints')
 parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                     help='learning rate (default: 0.01)')
 parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
@@ -36,126 +41,197 @@ torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
+faces = datasets.ImageFolder(data_path, transforms.Compose([
+        transforms.Resize([128,128]), 
+        transforms.ToTensor()
+    ]))
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 train_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('../data', train=True, download=True,
-                   transform=transforms.Compose([
-                       transforms.ToTensor(),
-                       transforms.Normalize((0.1307,), (0.3081,))
-                   ])),
+    faces,
     batch_size=args.batch_size, shuffle=True, **kwargs)
 test_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('../data', train=False, transform=transforms.Compose([
-                       transforms.ToTensor(),
-                       transforms.Normalize((0.1307,), (0.3081,))
-                   ])),
+    faces,
     batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
-class AlexNet(nn.Module):
+def weights_init(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        m.weight.data.normal_(0.0, 0.02)
+    elif classname.find('BatchNorm') != -1:
+        m.weight.data.normal_(1.0, 0.02)
+        m.bias.data.fill_(0)
+    elif classname.find('Linear') != -1:
+        m.weight.data.normal_(0.0, 0.02)
+        m.bias.data.fill_(0)
 
-    def __init__(self, num_classes=1000):
-        super(AlexNet, self).__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2),
-            nn.Conv2d(64, 192, kernel_size=5, padding=2),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2),
-            nn.Conv2d(192, 384, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(384, 256, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(256, 256, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2),
-        )
-        self.classifier = nn.Sequential(
-            nn.Dropout(),
-            nn.Linear(256 * 6 * 6, 4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.Linear(4096, 4096),
-            nn.ReLU(inplace=True),
-            nn.Linear(4096, num_classes),
-        )
 
-    def forward(self, x):
-        x = self.features(x)
-        x = x.view(x.size(0), 256 * 6 * 6)
-        x = self.classifier(x)
-        return x
-
-class Net(nn.Module):
+class GNet(nn.Module):
     def __init__(self):
-        super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(1, 20, kernel_size=7)
-        self.conv2 = nn.Conv2d(20, 40, kernel_size=7)
-        self.conv2_drop = nn.Dropout2d()
-        self.fc1 = nn.Linear(160, 200)
-        self.fc2 = nn.Linear(200, 10)
+        super(GNet, self).__init__()
+        self.main = nn.Sequential(
+            nn.ConvTranspose2d(100, 1024, 4, 1, 0, bias=False),
+            nn.BatchNorm2d(1024),
+            nn.ReLU(True),
+            # 256 x 4 x 4
+            nn.ConvTranspose2d(1024, 512, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(512),
+            nn.ReLU(True),
+            # 128 x 8 x 8
+            nn.ConvTranspose2d(512, 256, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(256),
+            nn.ReLU(True),
+            # 64 x 16 x 16
+            nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(128),
+            nn.ReLU(True),
+            # 32 x 32 x 32
+            nn.ConvTranspose2d(128, 64, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+            # 16 x 64 x 64
+            nn.ConvTranspose2d(64, 3, 4, 2, 1, bias=False),
+            nn.Tanh()
+            # 3 x 128 x 128
+        )
 
-    def forward(self, x):
-        x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        x = x.view(-1, 160)
-        x = F.relu(self.fc1(x))
-        x = F.dropout(x, training=self.training)
-        x = self.fc2(x)
-        return F.log_softmax(x, dim=1)
+    def forward(self, input):
+        return self.main(input)
 
-model = Net()
-if args.cuda:
-    model.cuda()
+discriminator = models.alexnet(pretrained=True)
 
-optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+# let s customize a bit our alexnet
 
-def alexnet(pretrained=False, **kwargs):
-    r"""AlexNet model architecture from the
-    `"One weird trick..." <https://arxiv.org/abs/1404.5997>`_ paper.
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    model = AlexNet(**kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['alexnet']))
-    return model
+for parameter in discriminator.features.parameters():
+    parameter.requires_grad = False
 
-model = alexnet(pretrained=True)
+discriminator.classifier = nn.Sequential(
+            nn.Dropout(),
+            nn.Linear(256 * 3 * 3, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Linear(4096, 1024),
+            nn.ReLU(inplace=True),
+            nn.Linear(1024, 1),
+            nn.Sigmoid()
+        )
 
-def train(epoch):
-    model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        if args.cuda:
-            data, target = data.cuda(), target.cuda()
-        data, target = Variable(data), Variable(target)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output, target)
-        loss.backward()
-        optimizer.step()
-        if batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.data[0]))
+def custom_forward(self, x):
+    x = self.features(x)
+    x = x.view(x.size(0), 256 * 3 * 3)
+    x = self.classifier(x)
+    return x.squeeze()
 
-def test():
-    model.eval()
-    test_loss = 0
-    correct = 0
-    for data, target in test_loader:
-        if args.cuda:
-            data, target = data.cuda(), target.cuda()
-        data, target = Variable(data, volatile=True), Variable(target)
-        output = model(data)
-        test_loss += F.nll_loss(output, target, size_average=False).data[0] # sum up batch loss
-        pred = output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
-        correct += pred.eq(target.data.view_as(pred)).long().cpu().sum()
+models.AlexNet.forward = custom_forward
 
-    test_loss /= len(test_loader.dataset)
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+generator = GNet()
 
-test()
+generator.apply(weights_init)
+print(generator)
+
+discriminator.classifier.apply(weights_init)
+print(discriminator)
+
+def train():
+
+    criterion = nn.BCELoss()
+
+    image_tensor = torch.FloatTensor(args.batch_size, 3, 128, 128)
+    image_noise = torch.FloatTensor(args.batch_size, 3, 128, 128)
+    noise = torch.FloatTensor(args.batch_size, 100, 1, 1)
+    fixed_noise = torch.FloatTensor(args.batch_size, 100, 1, 1).normal_(0, 1)
+    label = torch.FloatTensor(args.batch_size)
+    real_label = 1
+    fake_label = 0
+
+    if args.cuda:
+        discriminator.cuda()
+        generator.cuda()
+        criterion.cuda()
+        image_tensor = image_tensor.cuda()
+        image_noise = image_noise.cuda()
+        label = label.cuda()
+        noise = noise.cuda()
+        fixed_noise = fixed_noise.cuda()
+
+    fixed_noise = Variable(fixed_noise)
+
+    generator_optimizer = optim.Adam(generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+    discriminator_optimizer = optim.Adam(discriminator.classifier.parameters(), lr=0.0002, betas=(0.5, 0.999))
+
+    total_samples = args.epochs * len(train_loader) / 2
+
+
+    for epoch in range(args.epochs):
+        for i, data in enumerate(train_loader):
+            ### update discriminator
+
+            ip = len(train_loader) * epoch + i
+
+            # first real sample
+            discriminator.classifier.zero_grad()
+            image, _ = data
+            if args.cuda:
+                image = image.cuda()
+            image_tensor.resize_as_(image).copy_(image)
+            label.resize_(image.size(0)).fill_(real_label)
+
+            image_noise.resize_as_(image).normal_(0.0, 1.0)
+            if ip < total_samples:
+                image_tensor = image_tensor * (0.9 + 0.1 * ip / total_samples) + image_noise * (0.1 - 0.1 * ip/total_samples)
+            image_var = Variable(image_tensor)
+            label_var = Variable(label)
+
+            output = discriminator(image_var)
+
+            err_discriminator_real = criterion(output, label_var)
+            err_discriminator_real.backward()
+
+            d_x = output.data.mean()
+
+            # second fake sample
+
+            noise.resize_(image.size(0), 100, 1, 1).normal_(0,1)
+            noise_var = Variable(noise)
+            fake = generator(noise_var)
+            label.fill_(fake_label)
+            label_var = Variable(label)
+
+            output = discriminator(fake.detach())
+            err_discriminator_fake = criterion(output, label_var)
+            err_discriminator_fake.backward()
+
+            d_g_z1 = output.data.mean()
+            err_discriminator = err_discriminator_fake + err_discriminator_real
+
+            discriminator_optimizer.step()
+
+            ### update generator
+
+            generator.zero_grad()
+
+            label.fill_(real_label)
+            label_var = Variable(label)
+            output = discriminator(fake)
+            err_generator = criterion(output, label_var)
+            err_generator.backward()
+
+            d_g_z2 = output.data.mean()
+            generator_optimizer.step()
+
+            print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
+              % (epoch, args.epochs, i, len(train_loader),
+                 err_discriminator.data[0], err_generator.data[0], d_x, d_g_z1, d_g_z2))
+            if i % 100 == 0:
+                vutils.save_image(image,
+                        '%s/real_samples.png' % args.output_dir,
+                        normalize=True)
+                fake = generator(fixed_noise)
+                vutils.save_image(fake.data,
+                        '%s/fake_samples_epoch_%03d.png' % (args.output_dir, epoch),
+                        normalize=True)
+
+    torch.save(generator.state_dict(), '%s/netG_epoch_%d.pth' % (args.output_dir, epoch))
+    torch.save(discriminator.state_dict(), '%s/netD_epoch_%d.pth' % (args.output_dir, epoch))
+
+train()
