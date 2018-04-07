@@ -1,19 +1,19 @@
 import argparse
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import datasets, transforms, models
 from torch.autograd import Variable
-import torch.utils.model_zoo as model_zoo
+
+from torchvision import datasets, transforms
 import torchvision.utils as vutils
 
-import os
-data_path = os.path.abspath("data/faces/raw")
-
-model_urls = {
-    'alexnet': 'https://download.pytorch.org/models/alexnet-owt-4df8aa71.pth',
-}
+# import custom models
+from models.generator_net_64 import GeneratorNet64
+from models.discriminator_net_64 import DiscriminatorNet64
+from models.custom_alex_net import CustomAlexNet
 
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
@@ -24,34 +24,53 @@ parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
 parser.add_argument('--epochs', type=int, default=10, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--output-dir', default='./out', help='folder to output images and model checkpoints')
-parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
-                    help='learning rate (default: 0.01)')
-parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
-                    help='SGD momentum (default: 0.5)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
+parser.add_argument('--dataset', default='coco', help='which dataset to use (coco/folder)')
+parser.add_argument('--data-path', default='data/faces/raw', help='relative path to a folder containing a folder containing images to learn from')
+parser.add_argument('--coco-path', default='data/coco/train2017', help='relative path to a folder containing a folder containing images to learn from')
+parser.add_argument('--coco-annotations-path', default='data/coco/annotations/stuff_train2017.json', help='relative path to a folder containing a folder containing images to learn from')
+parser.add_argument('--image-size', type=int, default=64, help='image will be resized to this size')
+
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
+if args.cuda:
+    print("Using CUDA")
 
 torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-faces = datasets.ImageFolder(data_path, transforms.Compose([
-        transforms.Resize([128,128]), 
-        transforms.ToTensor()
-    ]))
+data_path = os.path.abspath(args.data_path)
+
+# Load dataset
+print(f'Loading dataset {args.dataset}')
+if args.dataset == 'folder':
+    dataset = datasets.ImageFolder(data_path, transforms.Compose([
+            transforms.Resize([args.image_size,args.image_size]), 
+            transforms.ToTensor()
+        ]))
+elif args.dataset == 'coco':
+    print(f'Loading dataset from :')
+    print(f'  - images : {args.coco_path}')
+    print(f'  - annotations : {args.coco_annotations_path}')
+    dataset = datasets.coco.CocoCaptions(args.coco_path, args.coco_annotations_path, transforms.Compose([
+            transforms.Resize([args.image_size,args.image_size]), 
+            transforms.ToTensor()
+        ]))
+
+print(f'{len(dataset)} samples found')
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 train_loader = torch.utils.data.DataLoader(
-    faces,
+    dataset,
     batch_size=args.batch_size, shuffle=True, **kwargs)
 test_loader = torch.utils.data.DataLoader(
-    faces,
+    dataset,
     batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
 def weights_init(m):
@@ -65,72 +84,19 @@ def weights_init(m):
         m.weight.data.normal_(0.0, 0.02)
         m.bias.data.fill_(0)
 
+# Creating networks
 
-class GNet(nn.Module):
-    def __init__(self):
-        super(GNet, self).__init__()
-        self.main = nn.Sequential(
-            nn.ConvTranspose2d(100, 1024, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(1024),
-            nn.ReLU(True),
-            # 256 x 4 x 4
-            nn.ConvTranspose2d(1024, 512, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(512),
-            nn.ReLU(True),
-            # 128 x 8 x 8
-            nn.ConvTranspose2d(512, 256, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(256),
-            nn.ReLU(True),
-            # 64 x 16 x 16
-            nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(128),
-            nn.ReLU(True),
-            # 32 x 32 x 32
-            nn.ConvTranspose2d(128, 64, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU(True),
-            # 16 x 64 x 64
-            nn.ConvTranspose2d(64, 3, 4, 2, 1, bias=False),
-            nn.Tanh()
-            # 3 x 128 x 128
-        )
+print('Creating networks')
 
-    def forward(self, input):
-        return self.main(input)
-
-discriminator = models.alexnet(pretrained=True)
-
-# let s customize a bit our alexnet
-
-for parameter in discriminator.features.parameters():
-    parameter.requires_grad = False
-
-discriminator.classifier = nn.Sequential(
-            nn.Dropout(),
-            nn.Linear(256 * 3 * 3, 4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.Linear(4096, 1024),
-            nn.ReLU(inplace=True),
-            nn.Linear(1024, 1),
-            nn.Sigmoid()
-        )
-
-def custom_forward(self, x):
-    x = self.features(x)
-    x = x.view(x.size(0), 256 * 3 * 3)
-    x = self.classifier(x)
-    return x.squeeze()
-
-models.AlexNet.forward = custom_forward
-
-generator = GNet()
-
-generator.apply(weights_init)
+generator = GeneratorNet64()
+generator.to_tune().apply(weights_init)
 print(generator)
 
-discriminator.classifier.apply(weights_init)
+discriminator = DiscriminatorNet64()
+discriminator.to_tune().apply(weights_init)
 print(discriminator)
+
+# Launch training
 
 def train():
 
@@ -156,11 +122,10 @@ def train():
 
     fixed_noise = Variable(fixed_noise)
 
-    generator_optimizer = optim.Adam(generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
-    discriminator_optimizer = optim.Adam(discriminator.classifier.parameters(), lr=0.0002, betas=(0.5, 0.999))
+    generator_optimizer = optim.Adam(generator.to_tune().parameters(), lr=0.0002, betas=(0.5, 0.999))
+    discriminator_optimizer = optim.Adam(discriminator.to_tune().parameters(), lr=0.0002, betas=(0.5, 0.999))
 
     total_samples = args.epochs * len(train_loader) / 2
-
 
     for epoch in range(args.epochs):
         for i, data in enumerate(train_loader):
@@ -169,7 +134,7 @@ def train():
             ip = len(train_loader) * epoch + i
 
             # first real sample
-            discriminator.classifier.zero_grad()
+            discriminator.to_tune().zero_grad()
             image, _ = data
             if args.cuda:
                 image = image.cuda()
@@ -208,7 +173,7 @@ def train():
 
             ### update generator
 
-            generator.zero_grad()
+            generator.to_tune().zero_grad()
 
             label.fill_(real_label)
             label_var = Variable(label)
