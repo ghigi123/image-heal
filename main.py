@@ -11,8 +11,8 @@ from torchvision import datasets, transforms
 import torchvision.utils as vutils
 
 # import custom models
-from models.generator_net_64 import GeneratorNet64
-from models.discriminator_net_64 import DiscriminatorNet64
+from models.generator_net_128 import GeneratorNet128
+from models.discriminator_net_128 import DiscriminatorNet128
 from models.custom_alex_net import CustomAlexNet
 
 # Training settings
@@ -21,7 +21,7 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
 parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
-parser.add_argument('--epochs', type=int, default=10, metavar='N',
+parser.add_argument('--epochs', type=int, default=40, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--output-dir', default='./out', help='folder to output images and model checkpoints')
 parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -34,7 +34,7 @@ parser.add_argument('--dataset', default='coco', help='which dataset to use (coc
 parser.add_argument('--data-path', default='data/faces/raw', help='relative path to a folder containing a folder containing images to learn from')
 parser.add_argument('--coco-path', default='data/coco/train2017', help='relative path to a folder containing a folder containing images to learn from')
 parser.add_argument('--coco-annotations-path', default='data/coco/annotations/stuff_train2017.json', help='relative path to a folder containing a folder containing images to learn from')
-parser.add_argument('--image-size', type=int, default=64, help='image will be resized to this size')
+parser.add_argument('--image-size', type=int, default=128, help='image will be resized to this size')
 
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -88,12 +88,16 @@ def weights_init(m):
 
 print('Creating networks')
 
-generator = GeneratorNet64()
+generator = GeneratorNet128()
 generator.to_tune().apply(weights_init)
+#generator.load_state_dict(torch.load("out/netG_epoch_19.pth"))
+
 print(generator)
 
-discriminator = DiscriminatorNet64()
+discriminator = DiscriminatorNet128(32)
 discriminator.to_tune().apply(weights_init)
+#discriminator.load_state_dict(torch.load("out/netD_epoch_19.pth"))
+
 print(discriminator)
 
 # Launch training
@@ -102,8 +106,8 @@ def train():
 
     criterion = nn.BCELoss()
 
-    image_tensor = torch.FloatTensor(args.batch_size, 3, 128, 128)
-    image_noise = torch.FloatTensor(args.batch_size, 3, 128, 128)
+    image_tensor = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size)
+    image_noise = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size)
     noise = torch.FloatTensor(args.batch_size, 100, 1, 1)
     fixed_noise = torch.FloatTensor(args.batch_size, 100, 1, 1).normal_(0, 1)
     label = torch.FloatTensor(args.batch_size)
@@ -125,7 +129,7 @@ def train():
     generator_optimizer = optim.Adam(generator.to_tune().parameters(), lr=0.0002, betas=(0.5, 0.999))
     discriminator_optimizer = optim.Adam(discriminator.to_tune().parameters(), lr=0.0002, betas=(0.5, 0.999))
 
-    total_samples = args.epochs * len(train_loader) / 2
+    total_samples = args.epochs * len(train_loader) / 10
 
     for epoch in range(args.epochs):
         for i, data in enumerate(train_loader):
@@ -143,7 +147,8 @@ def train():
 
             image_noise.resize_as_(image).normal_(0.0, 1.0)
             if ip < total_samples:
-                image_tensor = image_tensor * (0.9 + 0.1 * ip / total_samples) + image_noise * (0.1 - 0.1 * ip/total_samples)
+               image_tensor = image_tensor * (0.5 + 0.5 * ip / total_samples) + image_noise * (0.5 - 0.5 * ip/total_samples)
+            
             image_var = Variable(image_tensor)
             label_var = Variable(label)
 
@@ -198,5 +203,70 @@ def train():
 
     torch.save(generator.state_dict(), '%s/netG_epoch_%d.pth' % (args.output_dir, epoch))
     torch.save(discriminator.state_dict(), '%s/netD_epoch_%d.pth' % (args.output_dir, epoch))
+
+def complete():
+    lbd = 0.1
+    image_to_complete = dataset[10][0]
+    image_to_complete = image_to_complete.resize_(1, 3, args.image_size, args.image_size)
+    mask_w = 26
+    mask_h = 26
+    centered_mask = torch.FloatTensor(1, 3, args.image_size, args.image_size).fill_(1.)
+    centered_mask[:, :,(args.image_size-mask_w)//2:(args.image_size+mask_w)//2,(args.image_size-mask_h)//2:(args.image_size+mask_h)//2] = 0.
+    mask = centered_mask
+    base_noise = torch.FloatTensor(1,100,1,1).normal_(0.0,1.0)
+    label = torch.FloatTensor(1,1).fill_(1.)
+
+    contextual_loss = nn.SmoothL1Loss()
+    perceptual_loss = nn.BCELoss()
+
+    if args.cuda:
+        contextual_loss.cuda()
+        perceptual_loss.cuda()
+
+        discriminator.cuda()
+        generator.cuda()
+
+        label = label.cuda()
+        base_noise = base_noise.cuda()
+        mask = mask.cuda()
+        image_to_complete = image_to_complete.cuda()
+
+    label_var = Variable(label)
+    base_noise_var = Variable(base_noise)
+    base_noise_var.requires_grad = True
+    mask_var = Variable(mask)
+    image_to_complete_var = Variable(image_to_complete)
+
+    optimizer = optim.Adam([base_noise_var], lr = 0.002, betas=(0.5, 0.999))
+
+    for param in generator.parameters():
+        param.requires_grad = False
+    for param in discriminator.parameters():
+        param.requires_grad = False
+
+    n_iter = 5000
+
+    for i in range(n_iter):
+        generated = generator(base_noise_var)
+
+        ctx_loss = contextual_loss(generated * mask_var, image_to_complete_var * mask_var)
+
+        rating = discriminator(generated)
+        pcpt_loss = perceptual_loss(rating, label_var)
+
+        total_loss = ctx_loss + lbd * pcpt_loss
+
+        total_loss.backward()
+
+        print('[%d/%d] Ctx_loss : %.4f, Pcpt_loss : %.4f, Total_loss : %.4f' % (i + 1, n_iter, ctx_loss.data[0], pcpt_loss.data[0], total_loss.data[0]))
+        optimizer.step()
+
+        reconstructed = mask_var * image_to_complete_var + (1.0 - mask_var) * generated
+
+
+
+    vutils.save_image(generated.data, f'{args.output_dir}/generated.png')
+    vutils.save_image(image_to_complete, f'{args.output_dir}/source.png')
+    vutils.save_image(reconstructed.data, f'{args.output_dir}/reconstructed.png')
 
 train()
