@@ -6,7 +6,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 
-from torchvision import datasets, transforms
 import torchvision.utils as vutils
 
 # import custom models
@@ -16,38 +15,11 @@ from models.discriminator_net_128 import DiscriminatorNet128
 from models.discriminator_net_64 import DiscriminatorNet64
 from models.custom_alex_net import CustomAlexNet
 
-from parse_args import parse_args
+from utils import parse_args, weights_init, dataset_loaders
 args = parse_args()
 
 # Load dataset
-
-dataset = datasets.ImageFolder(args.data_path, transforms.Compose([
-        transforms.Resize([args.image_size,args.image_size]), 
-        transforms.ToTensor()
-    ]))
-
-
-print(f'{len(dataset)} samples found')
-
-kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
-train_loader = torch.utils.data.DataLoader(
-    dataset,
-    batch_size=args.batch_size, shuffle=True, **kwargs)
-test_loader = torch.utils.data.DataLoader(
-    dataset,
-    batch_size=args.test_batch_size, shuffle=True, **kwargs)
-
-
-def weights_init(m):
-    classname = m.__class__.__name__
-    if 'Conv' in classname:
-        m.weight.data.normal_(0.0, 0.02)
-    elif 'BatchNorm' in classname:
-        m.weight.data.normal_(1.0, 0.02)
-        m.bias.data.fill_(0)
-    elif 'Linear' in classname:
-        m.weight.data.normal_(0.0, 0.02)
-        m.bias.data.fill_(0)
+dataset, train_loader, test_loader = dataset_loaders(args)
 
 
 def train():

@@ -1,6 +1,8 @@
 import argparse
 import torch
+from torchvision import datasets, transforms
 import os
+
 
 def parse_args():
     # Training settings
@@ -36,3 +38,33 @@ def parse_args():
     args.data_path = os.path.abspath(args.data_path)
 
     return args
+
+
+def weights_init(m):
+    classname = m.__class__.__name__
+    if 'Conv' in classname:
+        m.weight.data.normal_(0.0, 0.02)
+    elif 'BatchNorm' in classname:
+        m.weight.data.normal_(1.0, 0.02)
+        m.bias.data.fill_(0)
+    elif 'Linear' in classname:
+        m.weight.data.normal_(0.0, 0.02)
+        m.bias.data.fill_(0)
+
+
+def dataset_loaders(args):
+    dataset = datasets.ImageFolder(args.data_path, transforms.Compose([
+        transforms.Resize([args.image_size, args.image_size]),
+        transforms.ToTensor()
+    ]))
+
+    print(f'{len(dataset)} samples found')
+
+    kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
+    train_loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=args.batch_size, shuffle=True, **kwargs)
+    test_loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=args.test_batch_size, shuffle=True, **kwargs)
+    return dataset, train_loader, test_loader
