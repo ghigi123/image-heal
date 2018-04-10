@@ -1,4 +1,3 @@
-import argparse
 import os
 
 import torch
@@ -17,40 +16,12 @@ from models.discriminator_net_128 import DiscriminatorNet128
 from models.discriminator_net_64 import DiscriminatorNet64
 from models.custom_alex_net import CustomAlexNet
 
-# Training settings
-parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
-parser.add_argument('--batch-size', type=int, default=64, metavar='N',
-                    help='input batch size for training (default: 64)')
-parser.add_argument('--mode', default='train',
-                    help='train or complete')
-parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
-                    help='input batch size for testing (default: 1000)')
-parser.add_argument('--epochs', type=int, default=40, metavar='N',
-                    help='number of epochs to train (default: 10)')
-parser.add_argument('--output-dir', default='./out', help='folder to output images and model checkpoints')
-parser.add_argument('--no-cuda', action='store_true', default=False,
-                    help='disables CUDA training')
-parser.add_argument('--seed', type=int, default=1, metavar='S',
-                    help='random seed (default: 1)')
-parser.add_argument('--log-interval', type=int, default=10, metavar='N',
-                    help='how many batches to wait before logging training status')
-parser.add_argument('--data-path', default='data/faces/raw', help='relative path to a folder containing a folder containing images to learn from')
-parser.add_argument('--image-size', type=int, default=64, help='image will be resized to this size')
-
-args = parser.parse_args()
-args.cuda = not args.no_cuda and torch.cuda.is_available()
-if args.cuda:
-    print("Using CUDA")
-
-torch.manual_seed(args.seed)
-if args.cuda:
-    torch.cuda.manual_seed(args.seed)
-
-data_path = os.path.abspath(args.data_path)
+from parse_args import parse_args
+args = parse_args()
 
 # Load dataset
 
-dataset = datasets.ImageFolder(data_path, transforms.Compose([
+dataset = datasets.ImageFolder(args.data_path, transforms.Compose([
         transforms.Resize([args.image_size,args.image_size]), 
         transforms.ToTensor()
     ]))
@@ -66,38 +37,20 @@ test_loader = torch.utils.data.DataLoader(
     dataset,
     batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
+
 def weights_init(m):
     classname = m.__class__.__name__
-    if classname.find('Conv') != -1:
+    if 'Conv' in classname:
         m.weight.data.normal_(0.0, 0.02)
-    elif classname.find('BatchNorm') != -1:
+    elif 'BatchNorm' in classname:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
-    elif classname.find('Linear') != -1:
+    elif 'Linear' in classname:
         m.weight.data.normal_(0.0, 0.02)
         m.bias.data.fill_(0)
 
-# Creating networks
-
-print('Creating networks')
-
-generator = GeneratorNet64()
-discriminator = DiscriminatorNet64()
-
-if args.mode == 'train':
-    generator.to_tune().apply(weights_init)
-    discriminator.to_tune().apply(weights_init)
-elif args.mode == 'complete' :
-    generator.load_state_dict(torch.load("out/netG_epoch_39.pth"))
-    discriminator.load_state_dict(torch.load("out/netD_epoch_39.pth"))
-
-print(generator)
-print(discriminator)
-
-# Launch training
 
 def train():
-
     criterion = nn.BCELoss()
 
     image_tensor = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size)
@@ -142,7 +95,7 @@ def train():
             # image_noise.resize_as_(image).normal_(0.0, 1.0)
             # if ip < total_samples:
             #    image_tensor = image_tensor * (0.5 + 0.5 * ip / total_samples) + image_noise * (0.5 - 0.5 * ip/total_samples)
-            
+
             image_var = Variable(image_tensor)
             label_var = Variable(label)
 
@@ -155,7 +108,7 @@ def train():
 
             # second fake sample
 
-            noise.resize_(image.size(0), 100, 1, 1).normal_(0,1)
+            noise.resize_(image.size(0), 100, 1, 1).normal_(0, 1)
             noise_var = Variable(noise)
             fake = generator(noise_var)
             label.fill_(fake_label)
@@ -184,19 +137,20 @@ def train():
             generator_optimizer.step()
 
             print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
-              % (epoch, args.epochs, i, len(train_loader),
-                 err_discriminator.data[0], err_generator.data[0], d_x, d_g_z1, d_g_z2))
+                  % (epoch, args.epochs, i, len(train_loader),
+                     err_discriminator.data[0], err_generator.data[0], d_x, d_g_z1, d_g_z2))
             if i % 100 == 0:
                 vutils.save_image(image,
-                        '%s/real_samples.png' % args.output_dir,
-                        normalize=True)
+                                  '%s/real_samples.png' % args.output_dir,
+                                  normalize=True)
                 fake = generator(fixed_noise)
                 vutils.save_image(fake.data,
-                        '%s/fake_samples_epoch_%03d.png' % (args.output_dir, epoch),
-                        normalize=True)
+                                  '%s/fake_samples_epoch_%03d.png' % (args.output_dir, epoch),
+                                  normalize=True)
 
     torch.save(generator.state_dict(), '%s/netG_epoch_%d.pth' % (args.output_dir, epoch))
     torch.save(discriminator.state_dict(), '%s/netD_epoch_%d.pth' % (args.output_dir, epoch))
+
 
 def complete():
     n_samples = 100
@@ -206,10 +160,11 @@ def complete():
     mask_w = 26
     mask_h = 26
     centered_mask = torch.FloatTensor(n_samples, 3, args.image_size, args.image_size).fill_(1.)
-    centered_mask[:, :,(args.image_size-mask_w)//2:(args.image_size+mask_w)//2,(args.image_size-mask_h)//2:(args.image_size+mask_h)//2] = 0.
+    centered_mask[:, :, (args.image_size - mask_w) // 2:(args.image_size + mask_w) // 2,
+    (args.image_size - mask_h) // 2:(args.image_size + mask_h) // 2] = 0.
     mask = centered_mask
-    base_noise = torch.FloatTensor(n_samples,100,1,1).normal_(0.0,1.0)
-    label = torch.FloatTensor(n_samples,1).fill_(1.)
+    base_noise = torch.FloatTensor(n_samples, 100, 1, 1).normal_(0.0, 1.0)
+    label = torch.FloatTensor(n_samples, 1).fill_(1.)
 
     contextual_loss = nn.SmoothL1Loss(reduce=False)
     perceptual_loss = nn.MSELoss(reduce=False)
@@ -232,7 +187,7 @@ def complete():
     mask_var = Variable(mask)
     image_to_complete_var = Variable(image_to_complete)
 
-    optimizer = optim.Adam([base_noise_var], lr = 0.002, betas=(0.5, 0.999))
+    optimizer = optim.Adam([base_noise_var], lr=0.002, betas=(0.5, 0.999))
 
     for param in generator.parameters():
         param.requires_grad = False
@@ -258,14 +213,13 @@ def complete():
 
         print(f'total_loss size : {total_loss.size()}')
 
-
         total_loss.mean().backward()
 
-        print('[%d/%d] Ctx_loss : %.4f, Pcpt_loss : %.4f, Total_loss : %.4f' % (i + 1, n_iter, ctx_loss.data[0], pcpt_loss.data[0], total_loss.data[0]))
+        print('[%d/%d] Ctx_loss : %.4f, Pcpt_loss : %.4f, Total_loss : %.4f' % (
+        i + 1, n_iter, ctx_loss.data[0], pcpt_loss.data[0], total_loss.data[0]))
         optimizer.step()
 
         reconstructed = mask_var * image_to_complete_var + (1.0 - mask_var) * generated
-
 
     _, idces = total_loss.data.min(0)
 
@@ -275,7 +229,23 @@ def complete():
     vutils.save_image(image_to_complete[idces], f'{args.output_dir}/source.png')
     vutils.save_image(reconstructed.data[idces], f'{args.output_dir}/reconstructed.png')
 
-if args.mode == 'train':
-    train()
-elif args.mode == 'complete':
-    complete()
+
+if __name__ == '__main__':
+    # Creating networks
+    print('Creating networks')
+
+    generator = GeneratorNet64()
+    discriminator = DiscriminatorNet64()
+
+    if args.mode == 'train':
+        generator.to_tune().apply(weights_init)
+        discriminator.to_tune().apply(weights_init)
+        print(generator)
+        print(discriminator)
+        train()
+    elif args.mode == 'complete':
+        generator.load_state_dict(torch.load("out/netG_epoch_39.pth"))
+        discriminator.load_state_dict(torch.load("out/netD_epoch_39.pth"))
+        print(generator)
+        print(discriminator)
+        complete()
