@@ -2,8 +2,9 @@ import torch.nn as nn
 
 
 class Autoencoder(nn.Module):
-    def __init__(self):
+    def __init__(self, hyper_resolution=True):
         super(Autoencoder, self).__init__()
+        self.hyper_resolution = hyper_resolution
 
         self.encoder = nn.Sequential(
             # IN: 3 * 128 * 128 -> 49152
@@ -25,6 +26,7 @@ class Autoencoder(nn.Module):
         self.decoder = nn.Sequential(
             # CODE: 16 * 8 * 8 -> 1024
             # 2.08 %
+            nn.Dropout2d(p=0.2),
             nn.ConvTranspose2d(16, 32, 4, stride=2, padding=1),
             nn.BatchNorm2d(32),
             # 32 * 16 * 16 -> 8192
@@ -42,9 +44,26 @@ class Autoencoder(nn.Module):
             nn.Tanh()
         )
 
+        self.hr = nn.Sequential(
+            nn.Conv2d(3, 16, 5, stride=1, padding=2),
+            nn.BatchNorm2d(16),
+            nn.ReLU(True),
+            nn.Conv2d(16, 3, 5, stride=1, padding=2),
+            nn.Tanh()
+        )
+
+        self.nn = nn.Sequential(
+            self.encoder,
+            self.decoder,
+            self.hr
+        )
+
     def forward(self, input):
         code = self.encoder(input)
         output = self.decoder(code)
+
+        output = self.hr(output) + output
+
         return output
 
 
