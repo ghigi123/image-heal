@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 from torchvision.utils import save_image
-from utils import parse_args, dataset_loaders
+from utils import parse_args, dataset_loaders, weights_init
 
 args = parse_args()
 
@@ -35,6 +35,8 @@ if args.cuda:
     noise = noise.cuda()
     fixed_noise = fixed_noise.cuda()
 
+autoencoder.apply(weights_init)
+
 for epoch in range(args.epochs):
     for i, data in enumerate(train_loader):
         image, _ = data
@@ -52,9 +54,11 @@ for epoch in range(args.epochs):
         print('[%d/%d][%d/%d] Loss: %.4f'
               % (epoch, args.epochs, i, len(train_loader), loss.data[0]))
         if i % 100 == 0:
+            autoencoder.eval()
             save_image(image, '%s/real_samples_ae.png' % args.output_dir, normalize=True)
             save_image(autoencoder(image_var).data,
                               '%s/fake_samples_epoch_%03d_ae.png' % (args.output_dir, epoch),
                               normalize=True)
+            autoencoder.train()
 
 torch.save(autoencoder.state_dict(), './conv_autoencoder.pth')
