@@ -8,11 +8,13 @@ class Autoencoder(nn.Module):
         self.encoder = nn.Sequential(
             # IN: 3 * 128 * 128 -> 49152
             nn.Conv2d(3, 16, 4, stride=2, padding=1),
+            nn.BatchNorm2d(16),
             # 16 * 64 * 64 -> 65536
             nn.ReLU(True),
             nn.MaxPool2d(2, stride=2),
             # 16 * 32 * 32 -> 16384
             nn.Conv2d(16, 8, 3, stride=2, padding=1),
+            nn.BatchNorm2d(8),
             # 8 * 16 * 16 -> 2048
             nn.ReLU(True),
             nn.MaxPool2d(2, stride=2)
@@ -24,12 +26,15 @@ class Autoencoder(nn.Module):
             # CODE: 8 * 8 * 8 -> 512
             # 1.04 %
             nn.ConvTranspose2d(8, 16, 2, stride=2),
+            nn.BatchNorm2d(16),
             # 16 * 16 * 16 -> 4096
             nn.ReLU(True),
             nn.ConvTranspose2d(16, 8, 2, stride=2),
+            nn.BatchNorm2d(8),
             # 8 * 32 * 32 -> 8192
             nn.ReLU(True),
             nn.ConvTranspose2d(8, 8, 2, stride=2),
+            nn.BatchNorm2d(8),
             # 8 * 64 * 64 -> 32768
             nn.ReLU(True),
             nn.ConvTranspose2d(8, 3, 2, stride=2),
