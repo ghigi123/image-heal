@@ -14,6 +14,7 @@ from models.generator_net_64 import GeneratorNet64
 from models.discriminator_net_128 import DiscriminatorNet128
 from models.discriminator_net_64 import DiscriminatorNet64
 from models.custom_alex_net import CustomAlexNet
+from models.conv_autoencoder import AutoEncoder
 
 from utils import parse_args, weights_init, dataset_loaders
 args = parse_args()
@@ -21,6 +22,108 @@ args = parse_args()
 # Load dataset
 dataset, train_loader, test_loader = dataset_loaders(args)
 
+
+def train_autoencoder_gan():
+    criterion = nn.BCELoss()
+    l2_criterion = nn.MSELoss()
+
+    mask_w = 26
+    mask_h = 26
+
+    image_tensor = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size)
+    centered_mask = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size).fill_(1.)
+    centered_mask[:, :, (args.image_size - mask_w) // 2:(args.image_size + mask_w) // 2,
+    (args.image_size - mask_h) // 2:(args.image_size + mask_h) // 2] = 0.
+    mask = centered_mask
+    label = torch.FloatTensor(args.batch_size)
+
+    real_label = 1
+    fake_label = 0
+
+    if args.cuda:
+        discriminator.cuda()
+        generator.cuda()
+        criterion.cuda()
+        image_tensor = image_tensor.cuda()
+        mask = mask.cuda()
+
+    generator_optimizer = optim.Adam(generator.to_tune().parameters(), lr=0.002, betas=(0.5, 0.999))
+    discriminator_optimizer = optim.Adam(discriminator.to_tune().parameters(), lr=0.0002, betas=(0.5, 0.999))
+
+    for epoch in range(args.epochs):
+        for i, data in enumerate(train_loader):
+            ### update discriminator
+
+            # on a real sample
+
+            discriminator.to_tune().zero_grad()
+            image, _ = data
+            if args.cuda:
+                image.cuda()
+            image_tensor.resize_as_(image).copy_(image)
+            label.resize_(image.size(0)).fill_(real_label)
+
+            image_var = Variable(image_tensor)
+            label_var = Variable(label)
+
+            output = discriminator(image_var)
+
+            err_discriminator_real = criterion(output, label_var)
+            err_discriminator_real.backward()
+
+            d_x = output.data.mean()
+
+            # on a fake sample
+
+            masked_image_var = Variable(image_tensor * mask)
+            fake = generator(masked_image_var)
+
+            label.fill_(fake_label)
+            label_var = Variable(label)
+
+            output = discriminator(fake.detach())
+            print(label_var.size())
+            err_discriminator_fake = criterion(output, label_var)
+            err_discriminator_fake.backward()
+
+            d_g_z1 = output.data.mean()
+            err_discriminator = err_discriminator_fake + err_discriminator_real
+
+            discriminator_optimizer.step()
+
+            ### update generator
+
+            generator.to_tune().zero_grad()
+
+            err_l2 = l2_criterion(fake, image_var) * 0.999
+            err_l2.backward(retain_graph=True)
+
+            label.fill_(real_label)
+            label_var = Variable(label)
+            output = discriminator(fake)
+
+            err_adv = criterion(output, label_var) * 0.001
+            err_adv.backward()
+
+            err_generator = err_l2 + err_adv
+
+            d_g_z2 = output.data.mean()
+            generator_optimizer.step()
+
+            print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
+                  % (epoch, args.epochs, i, len(train_loader),
+                     err_discriminator.data[0], err_generator.data[0], d_x, d_g_z1, d_g_z2))
+            if i % 100 == 0:
+                vutils.save_image(image,
+                                  '%s/real_samples.png' % args.output_dir,
+                                  normalize=True)
+                fake = generator(masked_image_var)
+                vutils.save_image(fake.data,
+                                  '%s/fake_samples_epoch_%03d.png' % (args.output_dir, epoch),
+                                  normalize=True)
+
+    torch.save(generator.state_dict(), '%s/netG_epoch_%d.pth' % (args.output_dir, epoch))
+    torch.save(discriminator.state_dict(), '%s/netD_epoch_%d.pth' % (args.output_dir, epoch))
 
 def train():
     criterion = nn.BCELoss()
@@ -56,7 +159,7 @@ def train():
 
             ip = len(train_loader) * epoch + i
 
-            # first real sample
+            # on a real sample
             discriminator.to_tune().zero_grad()
             image, _ = data
             if args.cuda:
@@ -78,7 +181,7 @@ def train():
 
             d_x = output.data.mean()
 
-            # second fake sample
+            # on a fake sample
 
             noise.resize_(image.size(0), 100, 1, 1).normal_(0, 1)
             noise_var = Variable(noise)
@@ -221,3 +324,11 @@ if __name__ == '__main__':
         print(generator)
         print(discriminator)
         complete()
+    elif args.mode == 'cacestmoche':
+        generator = AutoEncoder()
+        discriminator = DiscriminatorNet64()
+        generator.to_tune().apply(weights_init)
+        discriminator.to_tune().apply(weights_init)
+        print(generator)
+        print(discriminator)
+        train_autoencoder_gan()
