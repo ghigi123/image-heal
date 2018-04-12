@@ -1,9 +1,9 @@
 import torch.nn as nn
 
 
-class Autoencoder(nn.Module):
+class AutoEncoder(nn.Module):
     def __init__(self, hyper_resolution=True):
-        super(Autoencoder, self).__init__()
+        super(AutoEncoder, self).__init__()
         self.hyper_resolution = hyper_resolution
 
         self.encoder = nn.Sequential(
@@ -44,34 +44,37 @@ class Autoencoder(nn.Module):
             nn.Tanh()
         )
 
-        self.hr = nn.Sequential(
-            nn.Conv2d(3, 16, 5, stride=1, padding=2),
-            nn.BatchNorm2d(16),
-            nn.ReLU(True),
-            nn.Conv2d(16, 3, 5, stride=1, padding=2),
-            nn.Tanh()
-        )
+        # self.hr = nn.Sequential(
+        #     nn.Conv2d(3, 16, 5, stride=1, padding=2),
+        #     nn.BatchNorm2d(16),
+        #     nn.ReLU(True),
+        #     nn.Conv2d(16, 3, 5, stride=1, padding=2),
+        #     nn.Tanh()
+        # )
 
-        self.nn = nn.Sequential(
-            self.encoder,
-            self.decoder,
-            self.hr
-        )
+        # self.nn = nn.Sequential(
+        #     self.encoder,
+        #     self.decoder#,
+        #     #self.hr
+        # )
 
     def forward(self, input):
         code = self.encoder(input)
         output = self.decoder(code)
 
-        output = self.hr(output) + output
+        #output = self.hr(output) + output
 
         return output
+    
+    def to_tune(self):
+        return self
 
 
 if __name__ == '__main__':
     import torch
     from torch.autograd import Variable
 
-    x = Variable(torch.rand((1, 3, 128, 128)))
+    x = Variable(torch.rand((1, 3, 64, 64)))
     print(x)
-    ae = Autoencoder()
+    ae = AutoEncoder()
     print(ae(x))
