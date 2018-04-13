@@ -76,14 +76,17 @@ class Autoencoder(nn.Module):
         #     nn.Tanh()
         # )
 
-        self.nn = nn.Sequential(
-            self.encoder,
-            self.bottle_neck,
-            self.decoder
-        )
+        # self.nn = nn.Sequential(
+        #     self.encoder,
+        #     self.bottle_neck,
+        #     self.decoder
+        # )
 
     def forward(self, input):
-        return self.nn(input)
+        out = self.encoder(input)
+        out = self.bottle_neck(out)
+        out = self.decoder(out)
+        return out
 
     def to_tune(self):
         return self
