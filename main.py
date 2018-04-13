@@ -14,10 +14,12 @@ from models.generator_net_64 import GeneratorNet64
 from models.discriminator_net_128 import DiscriminatorNet128
 from models.discriminator_net_64 import DiscriminatorNet64
 from models.custom_alex_net import CustomAlexNet
-from models.conv_autoencoder import AutoEncoder
+from models.conv_autoencoder import Autoencoder
 
 from utils import parse_args, weights_init, dataset_loaders
 args = parse_args()
+
+os.makedirs('%s' % args.output_dir, exist_ok=True)
 
 # Load dataset
 dataset, train_loader, test_loader = dataset_loaders(args)
@@ -31,10 +33,7 @@ def train_autoencoder_gan():
     mask_h = 26
 
     image_tensor = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size)
-    centered_mask = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size).fill_(1.)
-    centered_mask[:, :, (args.image_size - mask_w) // 2:(args.image_size + mask_w) // 2,
-    (args.image_size - mask_h) // 2:(args.image_size + mask_h) // 2] = 0.
-    mask = centered_mask
+    mask = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size)
     label = torch.FloatTensor(args.batch_size)
 
     real_label = 1
@@ -45,6 +44,7 @@ def train_autoencoder_gan():
         generator.cuda()
         criterion.cuda()
         image_tensor = image_tensor.cuda()
+        label = label.cuda()
         mask = mask.cuda()
 
     generator_optimizer = optim.Adam(generator.to_tune().parameters(), lr=0.002, betas=(0.5, 0.999))
@@ -59,8 +59,11 @@ def train_autoencoder_gan():
             discriminator.to_tune().zero_grad()
             image, _ = data
             if args.cuda:
-                image.cuda()
+                image = image.cuda()
             image_tensor.resize_as_(image).copy_(image)
+            mask.resize_as_(image).fill_(1.)
+            mask[:, :, (args.image_size - mask_w) // 2:(args.image_size + mask_w) // 2,
+            (args.image_size - mask_h) // 2:(args.image_size + mask_h) // 2] = 0.
             label.resize_(image.size(0)).fill_(real_label)
 
             image_var = Variable(image_tensor)
@@ -82,7 +85,6 @@ def train_autoencoder_gan():
             label_var = Variable(label)
 
             output = discriminator(fake.detach())
-            print(label_var.size())
             err_discriminator_fake = criterion(output, label_var)
             err_discriminator_fake.backward()
 
@@ -120,6 +122,10 @@ def train_autoencoder_gan():
                 fake = generator(masked_image_var)
                 vutils.save_image(fake.data,
                                   '%s/fake_samples_epoch_%03d.png' % (args.output_dir, epoch),
+                                  normalize=True)
+                masked = image_tensor * mask + fake.data.clamp(0,1) * (1-mask)
+                vutils.save_image(masked,
+                                  '%s/reconstructed_samples_epoch_%03d.png' % (args.output_dir, epoch),
                                   normalize=True)
 
     torch.save(generator.state_dict(), '%s/netG_epoch_%d.pth' % (args.output_dir, epoch))
@@ -325,7 +331,7 @@ if __name__ == '__main__':
         print(discriminator)
         complete()
     elif args.mode == 'cacestmoche':
-        generator = AutoEncoder()
+        generator = Autoencoder()
         discriminator = DiscriminatorNet64()
         generator.to_tune().apply(weights_init)
         discriminator.to_tune().apply(weights_init)
