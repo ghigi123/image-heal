@@ -85,6 +85,7 @@ def train_autoencoder_gan():
             label_var = Variable(label)
 
             output = discriminator(fake.detach())
+
             err_discriminator_fake = criterion(output, label_var)
             err_discriminator_fake.backward()
 
