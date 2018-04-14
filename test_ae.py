@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 from torchvision.utils import save_image
-from utils import parse_args, dataset_loaders, weights_init
+from utils import parse_args, dataset_loaders, weights_init, build_mask
 
 args = parse_args()
 
@@ -37,13 +37,14 @@ autoencoder.apply(weights_init)
 
 for epoch in range(args.epochs):
     for i, data in enumerate(train_loader):
-        image, _ = data
+        mask = build_mask((64, 64), 20, 20, 'random')
+        images, _ = data
         if args.cuda:
-            image = image.cuda()
-        image_tensor.resize_as_(image).copy_(image)
+            images = images.cuda()
+        image_tensor.resize_as_(images).copy_(images)
         image_var = Variable(image_tensor)
         # ===================forward=====================
-        output = autoencoder(image_var)
+        output = autoencoder(image_var.masked_fill(mask, 0))
         loss = criterion(output, image_var)
         # ===================backward====================
         optimizer.zero_grad()
@@ -53,7 +54,8 @@ for epoch in range(args.epochs):
               % (epoch, args.epochs, i, len(train_loader), loss.data[0]))
         if i % 100 == 0:
             autoencoder.eval()
-            save_image(image, '%s/real_samples_ae.png' % args.output_dir, normalize=True)
+            save_image(images, '%s/real_samples_ae.png' % args.output_dir, normalize=True)
+            save_image(image_var.masked_fill(mask, 0).data, '%s/blanked_samples_ae.png' % args.output_dir, normalize=True)
             save_image(autoencoder(image_var).data,
                               '%s/fake_samples_epoch_%03d_ae.png' % (args.output_dir, epoch),
                               normalize=True)

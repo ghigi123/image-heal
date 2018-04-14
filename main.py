@@ -326,8 +326,9 @@ if __name__ == '__main__':
         print(discriminator)
         train()
     elif args.mode == 'complete':
-        generator.load_state_dict(torch.load("out/netG_epoch_39.pth"))
-        discriminator.load_state_dict(torch.load("out/netD_epoch_39.pth"))
+        epoch = 39
+        generator.load_state_dict(torch.load(f"out/netG_epoch_{epoch}.pth"))
+        discriminator.load_state_dict(torch.load(f"out/netD_epoch_{epoch}.pth"))
         print(generator)
         print(discriminator)
         complete()

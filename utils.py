@@ -1,6 +1,8 @@
 import argparse
 import torch
+from torch.autograd import Variable
 from torchvision import datasets, transforms
+import random as rd
 import os
 
 
@@ -68,3 +70,28 @@ def dataset_loaders(args):
         dataset,
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
     return dataset, train_loader, test_loader
+
+
+def build_mask(im_size, width, height, position='center'):
+    im_width, im_height = im_size
+    mask = torch.ByteTensor(im_width, im_height).zero_()
+    if position == 'center':
+        cx, cy = im_width / 2, im_height / 2
+    elif position == 'random':
+        cx, cy = rd.randint(0, im_width - 1), rd.randint(0, im_height - 1)
+    elif isinstance(position, tuple):
+        cx, cy = position
+    else:
+        raise ValueError('Position is not valid')
+
+    mask[max(int(cx - width / 2), 0): min(int(cx + width / 2), im_width - 1), max(int(cy - height / 2), 0): min(int(cy + height / 2), im_height -1)] = 1
+
+    return Variable(mask, requires_grad=False)
+
+
+if __name__ == '__main__':
+    images = torch.Tensor(1, 3, 64, 64).random_()
+    print(images)
+    mask = build_mask(images, 11, 7, position='random')
+    print(mask.sum())
+    print(images * mask)
