@@ -24,8 +24,6 @@ def deconvolution(input_channels, output_channels, kernel_size, augment=2):
     else:
         padl, padr = pad, pad + 1
 
-    print(pad)
-
     return nn.Sequential(
         # assertion that reduction | input_size -> input_size / reduction = output_size int
         # TODO: nn.ReflectionPad2d((padl, padr, padl, padr)) in transpose
