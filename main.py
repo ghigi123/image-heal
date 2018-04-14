@@ -14,7 +14,7 @@ from models.generator_net_64 import GeneratorNet64
 from models.discriminator_net_128 import DiscriminatorNet128
 from models.discriminator_net_64 import DiscriminatorNet64
 from models.custom_alex_net import CustomAlexNet
-from models.conv_autoencoder import Autoencoder
+from models.conv_autoencoder import AutoEncoder
 
 from utils import parse_args, weights_init, dataset_loaders
 args = parse_args()
@@ -332,7 +332,7 @@ if __name__ == '__main__':
         print(discriminator)
         complete()
     elif args.mode == 'cacestmoche':
-        generator = Autoencoder()
+        generator = AutoEncoder()
         discriminator = DiscriminatorNet64()
         generator.to_tune().apply(weights_init)
         discriminator.to_tune().apply(weights_init)

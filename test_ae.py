@@ -1,4 +1,4 @@
-from models.conv_autoencoder import Autoencoder
+from models.conv_autoencoder import AutoEncoder
 
 import torch
 from torch import nn
@@ -11,9 +11,7 @@ args = parse_args()
 # Load dataset
 dataset, train_loader, test_loader = dataset_loaders(args)
 
-
-
-autoencoder = Autoencoder()
+autoencoder = AutoEncoder()
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(autoencoder.parameters(), lr=0.0002,
                              weight_decay=1e-5)
