@@ -1,3 +1,13 @@
+""""
+Main module implementing the solution using a discrimator :
+- DCGAN
+- Context Encoder
+
+Quick use :
+- python3 main.py --method {context-encoder | dcgan} --mode {train | complete}
+"""
+
+
 import os
 
 import torch
@@ -289,6 +299,7 @@ def complete_context_encoder():
                         normalize=True)
     
     print('images written in %s' % (args.output_dir))
+
 
 def complete_dcgan():
     # number of random z vector samples for every image

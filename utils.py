@@ -6,8 +6,9 @@ import random as rd
 import os
 import math
 
+
 def parse_args():
-    # Training settings
+    # Parse settings from the CLI
     parser = argparse.ArgumentParser(description='Image inpainting with pytorch')
     parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                         help='input batch size for training (default: 64)')
@@ -24,7 +25,8 @@ def parse_args():
                         help='random seed (default: 1)')
     parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                         help='how many batches to wait before logging training status')
-    parser.add_argument('--data-path', default='data/faces/raw', help='relative path to a folder containing a folder containing images to learn from')
+    parser.add_argument('--data-path', default='data/faces/raw',
+                        help='relative path to a folder containing a folder containing images to learn from')
     parser.add_argument('--image-size', type=int, default=64, help='image will be resized to this size')
     parser.add_argument('--method', default='context-encoder', help='which method to use (context-encoder or dcgan)')
     parser.add_argument('--discriminator-model-name', default='discriminator')
@@ -47,6 +49,7 @@ def parse_args():
 
 
 def weights_init(m):
+    # Init weights in a more effective manner
     classname = m.__class__.__name__
     if 'Conv' in classname:
         m.weight.data.normal_(0.0, 0.02)
@@ -69,7 +72,9 @@ class SubsetSampler(torch.utils.data.sampler.Sampler):
     def __len__(self):
         return len(self.indices)
 
+
 def dataset_loaders(args, train_frac = 0.99):
+    # Load the different datasets, resize images and transform them into tensors
     dataset = datasets.ImageFolder(args.data_path, transforms.Compose([
         transforms.Resize([args.image_size, args.image_size]),
         transforms.ToTensor()
@@ -78,6 +83,8 @@ def dataset_loaders(args, train_frac = 0.99):
     print(f'{len(dataset)} samples found')
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
+
+    # Make the train and test sets loader
     train_loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=args.batch_size, shuffle=False, sampler=torch.utils.data.sampler.SubsetRandomSampler(range(math.floor(len(dataset) * train_frac))), **kwargs)
@@ -86,7 +93,9 @@ def dataset_loaders(args, train_frac = 0.99):
         batch_size=args.batch_size, shuffle=False, sampler=SubsetSampler(range(math.floor(len(dataset) * train_frac), len(dataset))), **kwargs)
     return dataset, train_loader, test_loader
 
+
 def build_mask(im_size, width, height, position='center'):
+    # Build a mask to apply on images
     im_width, im_height = im_size
     mask = torch.ByteTensor(im_width, im_height).zero_()
     if position == 'center':
