@@ -3,49 +3,73 @@ Ce projet a pour but de proposer une solution d'inpainting par deux approches de
 Ces deux approches pemettent de générer une large partie manquante d'une image, en assurant la continuité de l'image sur la zone de transition et la cohérence de la sémantique de l'image.
 Notre première approche est un DCGAN(deep convolutional generative adversarial networks) avec des coûts "contextuels", pour assurer la cohérence sémantique de l'image et "perceptuels" pour réaliser l'inpainting. La deuxième approche est basée sur les auto-encodeurs, avec une fonction de coût adversariale pour améliorer le niveau de détail des résultats
 
-## Getting Started
-
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
 
 ### Prerequisites
 A installer avant de lancer le projet :
 - pytorch
 - torchvision
 
-### Installing
+### Utilisation
 
-???
-Mettez votre jeu de donnée dans data, les jeux de données que nous avons utilisés sont Labeled Faces in the Wild (LFW) et Common Objects in Context (COCO).
+Mettez votre jeu de donnée dans un dossier, les jeux de données que nous avons utilisés sont Labeled Faces in the Wild (LFW) et Common Objects in Context (COCO).
 
-Lancer main.py avec comme arguments method et mode.
-Les deux méthodes possibles sont: '' et 'context-encoder', pour choisir entre les deux approches développées. Les deux modes sont : 'train' et 'complete', qui servent respectivement à entraîner les système pour un jeu de données et à compléter l'image endommagée.
+Le fichier main.py permet de lancer training et complétion des images
 
-## Deployment
+```
+usage: main.py [-h] [--batch-size N] [--mode MODE] [--test-batch-size N]
+               [--epochs N] [--output-dir OUTPUT_DIR] [--no-cuda] [--seed S]
+               [--log-interval N] [--data-path DATA_PATH]
+               [--image-size IMAGE_SIZE] [--method METHOD]
+               [--discriminator-model-name DISCRIMINATOR_MODEL_NAME]
+               [--generator-model-name GENERATOR_MODEL_NAME]
+               [--mask-size MASK_SIZE]
 
-???
+Image inpainting with pytorch
 
-## Built With
-???
+optional arguments:
+  -h, --help            show this help message and exit
+  --batch-size N        input batch size for training (default: 64)
+  --mode MODE           train or complete
+  --test-batch-size N   input batch size for testing (default: 1000)
+  --epochs N            number of epochs to train (default: 10)
+  --output-dir OUTPUT_DIR
+                        folder to output images and model checkpoints
+  --no-cuda             disables CUDA training
+  --seed S              random seed (default: 1)
+  --log-interval N      how many batches to wait before logging training
+                        status
+  --data-path DATA_PATH
+                        relative path to a folder containing a folder
+                        containing images to learn from
+  --image-size IMAGE_SIZE
+                        image will be resized to this size
+  --method METHOD       which method to use (context-encoder or dcgan)
+  --discriminator-model-name DISCRIMINATOR_MODEL_NAME
+  --generator-model-name GENERATOR_MODEL_NAME
+  --mask-size MASK_SIZE
+                        size of the mask used for inpainting
+```
 
-## Contributing
-???
+Exemple d'usage :
 
-## Versioning
+```
+python main.py --data-path ./data/lfw-deepfunneled --mode train --output-dir encoder-lfw-128 --image-size 128 --method context-encoder --mask-size 60 --epochs 25
+```
 
-???
+Les deux méthodes possibles sont: 'dcgan' et 'context-encoder', pour choisir entre les deux approches développées. Les deux modes sont : 'train' et 'complete', qui servent respectivement à entraîner les système pour un jeu de données et à compléter l'image endommagée.
 
-## Authors
+## Auteurs
 
 * **Ghislain Janneau**
 * **Arnault Chazareix**
 * **Elodie Ikkache**
 
-## License
+## Remerciements
 
-???
+Approche DCGAN :
 
-## Acknowledgments
-pour l'approche dcgan:
-http://bamos.github.io/2016/08/09/deep-completion
-pour l'approche auto-encodeur:
-https://github.com/pathak22/context-encoder
+* http://bamos.github.io/2016/08/09/deep-completion/
+
+Approche context encoder :
+
+* http://people.eecs.berkeley.edu/~pathak/context_encoder/
