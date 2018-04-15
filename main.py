@@ -140,8 +140,8 @@ def train_context_encoder():
                                     '%s/reconstructed_samples_epoch_%03d.png' % (args.output_dir, epoch),
                                     normalize=True)
 
-    torch.save(generator.state_dict(), '%s/netG_epoch_%d.pth' % (args.output_dir, epoch))
-    torch.save(discriminator.state_dict(), '%s/netD_epoch_%d.pth' % (args.output_dir, epoch))
+    torch.save(generator.state_dict(), '%s/%s.pth' % (args.output_dir, args.generator_model_name))
+    torch.save(discriminator.state_dict(), '%s/%s.pth' % (args.output_dir, args.discriminator_model_name))
 
 def train_dcgan():
     criterion = nn.BCELoss()
@@ -241,12 +241,47 @@ def train_dcgan():
                                   '%s/fake_samples_epoch_%03d.png' % (args.output_dir, epoch),
                                   normalize=True)
 
-    torch.save(generator.state_dict(), '%s/netG_epoch_%d.pth' % (args.output_dir, epoch))
-    torch.save(discriminator.state_dict(), '%s/netD_epoch_%d.pth' % (args.output_dir, epoch))
+    torch.save(generator.state_dict(), '%s/%s.pth' % (args.output_dir, args.generator_model_name))
+    torch.save(discriminator.state_dict(), '%s/%s.pth' % (args.output_dir, args.discriminator_model_name))
 
 
 def complete_context_encoder():
-    pass
+
+    image_tensor = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size)
+    mask = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size)
+    
+    mask_w = args.mask_size
+    mask_h = args.mask_size
+
+    if args.cuda:
+        generator.cuda()
+        image_tensor = image_tensor.cuda()
+        mask = mask.cuda()
+
+    test_data, _ = [a for a in test_loader][0]
+
+    if args.cuda:
+        test_data = test_data.cuda()
+    image_tensor.resize_as_(test_data).copy_(test_data)
+    mask.resize_as_(test_data).fill_(1.)
+    mask[:, :, (args.image_size - mask_w) // 2:(args.image_size + mask_w) // 2,
+    (args.image_size - mask_h) // 2:(args.image_size + mask_h) // 2] = 0.
+    masked_image_var = Variable(image_tensor * mask + (1-mask)*image_tensor.mean())
+    fake = generator(masked_image_var)
+    masked = image_tensor * mask + fake.data.clamp(0,1) * (1-mask)
+
+    #only ouput batchsize images
+    vutils.save_image(test_data[0:args.batch_size],
+                        '%s/real_samples.png' % args.output_dir,
+                        normalize=True)
+    vutils.save_image(fake.data[0:args.batch_size],
+                        '%s/fake_samples_test.png' % (args.output_dir),
+                        normalize=True)
+    vutils.save_image(masked[0:args.batch_size],
+                        '%s/reconstructed_samples_test.png' % (args.output_dir),
+                        normalize=True)
+    
+    print('images written in %s' % (args.output_dir))
 
 def complete_dcgan():
     n_samples = 10
