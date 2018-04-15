@@ -2,26 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="2d54cda4-7e9c-4730-8868-3d8c75cebf05" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/image-heal.iml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/misc.xml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/modules.xml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/vcs.xml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/autoencoder/models/__init__.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/dcgan/__init__.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/dcgan/models/__init__.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/models/autoencoder/__init__.py" afterPath="$PROJECT_DIR$/autoencoder/__init__.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/models/autoencoder/bottleneck.py" afterPath="$PROJECT_DIR$/autoencoder/models/bottleneck.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/models/autoencoder/conv_decoder.py" afterPath="$PROJECT_DIR$/autoencoder/models/conv_decoder.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/models/autoencoder/conv_encoder.py" afterPath="$PROJECT_DIR$/autoencoder/models/conv_encoder.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/models/autoencoder/nn_utils.py" afterPath="$PROJECT_DIR$/autoencoder/models/nn_utils.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/models/conv_autoencoder.py" afterPath="$PROJECT_DIR$/autoencoder/models/conv_autoencoder.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/models/discriminator_net_128.py" afterPath="$PROJECT_DIR$/dcgan/models/discriminator_net_128.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/models/discriminator_net_64.py" afterPath="$PROJECT_DIR$/dcgan/models/discriminator_net_64.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/models/generator_net_128.py" afterPath="$PROJECT_DIR$/dcgan/models/generator_net_128.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/models/generator_net_64.py" afterPath="$PROJECT_DIR$/dcgan/models/generator_net_64.py" />
-      <change type="MOVED" beforePath="$PROJECT_DIR$/test_ae.py" afterPath="$PROJECT_DIR$/autoencoder/test_ae.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/main.py" afterPath="$PROJECT_DIR$/main.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -192,7 +173,7 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#0#30#0" expanded="true" />
+            <element signature="e#0#30#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -202,7 +183,7 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#0#15#0" expanded="true" />
+            <element signature="e#0#15#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -212,7 +193,7 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#0#21#0" expanded="true" />
+            <element signature="e#0#21#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -230,7 +211,7 @@
         <state relative-caret-position="357">
           <caret line="21" column="66" lean-forward="false" selection-start-line="21" selection-start-column="66" selection-end-line="21" selection-end-column="66" />
           <folding>
-            <element signature="e#0#12#0" expanded="true" />
+            <element signature="e#0#12#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -240,7 +221,7 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#0#21#0" expanded="true" />
+            <element signature="e#0#21#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -250,7 +231,7 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#0#21#0" expanded="true" />
+            <element signature="e#0#21#0" expanded="false" />
           </folding>
         </state>
       </provider>
