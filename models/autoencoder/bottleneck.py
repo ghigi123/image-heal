@@ -1,6 +1,7 @@
 import torch.nn as nn
 from models.autoencoder.nn_utils import convolution
 
+
 class Bottleneck(nn.Module):
     def __init__(self, in_channels):
         super().__init__()

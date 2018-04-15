@@ -9,7 +9,11 @@ class Decoder(nn.Module):
         layers = [(in_channels, )] + layers
 
         self.decoder = nn.Sequential(
-            *(deconvolution(layers[i][0], *layers[i + 1]) for i in range(len(layers) - 1))
+            *(deconvolution(layers[i][0], *layers[i + 1]) for i in range(len(layers) - 2)),
+            nn.Sequential(
+                nn.ConvTranspose2d(layers[-2][0], layers[-1][0], layers[-1][1], stride=2, padding=(layers[-1][1] - 2) // 2),
+                nn.Tanh(),
+            )
         )
 
     def forward(self, x):
