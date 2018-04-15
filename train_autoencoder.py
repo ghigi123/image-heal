@@ -37,22 +37,29 @@ autoencoder.apply(weights_init)
 
 for epoch in range(args.epochs):
     for i, data in enumerate(train_loader):
-        mask = build_mask((64, 64), 20, 20, 'random')
+        # Generate Mask
+        mask = build_mask((64, 64), 26, 26, 'center')
         images, _ = data
+
         if args.cuda:
             images = images.cuda()
+
         image_tensor.resize_as_(images).copy_(images)
         image_var = Variable(image_tensor)
-        # ===================forward=====================
+
+        # Forward propagation
         output = autoencoder(image_var.masked_fill(mask, 0))
         loss = criterion(output, image_var)
-        # ===================backward====================
+
+        # Backward propagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         print('[%d/%d][%d/%d] Loss: %.4f'
               % (epoch, args.epochs, i, len(train_loader), loss.data[0]))
+
         if i % 100 == 0:
+            # Test and save example images
             autoencoder.eval()
             save_image(images, '%s/real_samples_ae.png' % args.output_dir, normalize=True)
             save_image(image_var.masked_fill(mask, 0).data, '%s/blanked_samples_ae.png' % args.output_dir, normalize=True)
@@ -61,4 +68,6 @@ for epoch in range(args.epochs):
                               normalize=True)
             autoencoder.train()
 
-torch.save(autoencoder.state_dict(), './conv_autoencoder.pth')
+
+# Save model
+torch.save(autoencoder.state_dict(), f'./{args.output_dir}/conv_autoencoder.pth')

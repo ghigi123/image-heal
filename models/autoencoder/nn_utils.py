@@ -2,6 +2,9 @@ import torch.nn as nn
 
 
 def convolution(input_channels, output_channels, kernel_size, reduction=2):
+    # Convolution applied with padding SAME with stride = reduction.
+    # Reflection padding
+    # Used for downsampling
     pad = (kernel_size - reduction) // 2
     if (kernel_size - reduction) % 2 == 0:
         padl, padr = pad, pad
@@ -18,6 +21,9 @@ def convolution(input_channels, output_channels, kernel_size, reduction=2):
 
 
 def deconvolution(input_channels, output_channels, kernel_size, augment=2):
+    # Transposed onvolution with padding SAME with stride = augment.
+    # 0 padding
+    # Used for upsampling
     pad = (kernel_size - augment) // 2
     if (kernel_size - augment) % 2 == 0:
         padl, padr = pad, pad

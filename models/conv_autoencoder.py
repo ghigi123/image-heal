@@ -4,8 +4,9 @@ from models.autoencoder.conv_encoder import Encoder
 
 
 class AutoEncoder(nn.Module):
+    # Autoencoder module
     def __init__(self, input_channels=3, encoder_layers=None, decoder_layers=None, bn_size=4):
-        # For layers the tuple represent (channels, kernel size)
+        # For layers the tuple represent [(channels, kernel_size), ...]
         if encoder_layers is None:
             encoder_layers = [(32, 5), (64, 3), (128, 3), (256, 3)]
 
@@ -25,12 +26,6 @@ class AutoEncoder(nn.Module):
         )
 
         self.decoder = Decoder(encoder_output_channels, decoder_layers)
-
-        # self.nn = nn.Sequential(
-        #     self.encoder,
-        #     self.bottle_neck,
-        #     self.decoder
-        # )
 
     def forward(self, input):
         out = self.encoder(input)

@@ -3,6 +3,7 @@ from models.autoencoder.nn_utils import convolution
 
 
 class Bottleneck(nn.Module):
+    # Implement a bottleneck
     def __init__(self, in_channels):
         super().__init__()
 

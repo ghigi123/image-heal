@@ -58,6 +58,16 @@ python main.py --data-path ./data/lfw-deepfunneled --mode train --output-dir enc
 
 Les deux méthodes possibles sont: 'dcgan' et 'context-encoder', pour choisir entre les deux approches développées. Les deux modes sont : 'train' et 'complete', qui servent respectivement à entraîner les système pour un jeu de données et à compléter l'image endommagée.
 
+
+### Test auto-encodeur
+Le fichier `train_autoencoder.py` permet de tester l'entrainement de l'auto-encodeur en utilisant MSE comme unique fonction de coût.
+On utilise `build_mask` pour définir les caractéristiques du masque (positionné au hasard ou centré ; dimension).
+L'idée de ce fichier est essentiellement de tester différentes architectures de l'auto-encodeur (réduire les artefacts, comparer à la sortie etc ...).
+
+```
+python train_autoencoder.py
+```
+
 ## Auteurs
 
 * **Ghislain Janneau**

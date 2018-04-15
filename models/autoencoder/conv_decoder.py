@@ -3,7 +3,9 @@ from models.autoencoder.nn_utils import deconvolution
 
 
 class Decoder(nn.Module):
+    # Implement decoder part of autoencoder
     def __init__(self, in_channels, layers):
+        # Layers : [(layer_channels, kernel_size), ...]
         super().__init__()
 
         layers = [(in_channels, )] + layers
