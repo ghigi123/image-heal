@@ -2,21 +2,16 @@ import os
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
+import torchvision.utils as vutils
+# import custom models
+from dcgan.models.discriminator_net_64 import DiscriminatorNet64
+from dcgan.models.generator_net_64 import GeneratorNet64
 from torch.autograd import Variable
 
-import torchvision.utils as vutils
-
-# import custom models
-from models.generator_net_128 import GeneratorNet128
-from models.generator_net_64 import GeneratorNet64
-from models.discriminator_net_128 import DiscriminatorNet128
-from models.discriminator_net_64 import DiscriminatorNet64
-from models.custom_alex_net import CustomAlexNet
-from models.conv_autoencoder import AutoEncoder
-
+from autoencoder.models.conv_autoencoder import AutoEncoder
 from utils import parse_args, weights_init, dataset_loaders
+
 args = parse_args()
 
 os.makedirs('%s' % args.output_dir, exist_ok=True)
