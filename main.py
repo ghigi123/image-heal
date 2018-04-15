@@ -9,10 +9,8 @@ from torch.autograd import Variable
 import torchvision.utils as vutils
 
 # import custom models
-from models.generator_net_128 import GeneratorNet128
-from models.generator_net_64 import GeneratorNet64
-from models.discriminator_net_128 import DiscriminatorNet128
-from models.discriminator_net_64 import DiscriminatorNet64
+from models.generator_net import generator_net
+from models.discriminator_net import discriminator_net
 from models.custom_alex_net import CustomAlexNet
 from models.conv_autoencoder import AutoEncoder
 
@@ -25,12 +23,12 @@ os.makedirs('%s' % args.output_dir, exist_ok=True)
 dataset, train_loader, test_loader = dataset_loaders(args)
 
 
-def train_autoencoder_gan():
+def train_context_encoder():
     criterion = nn.BCELoss()
     l2_criterion = nn.MSELoss()
 
-    mask_w = 60
-    mask_h = 60
+    mask_w = args.mask_size
+    mask_h = args.mask_size
 
     image_tensor = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size)
     mask = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size)
@@ -117,22 +115,33 @@ def train_autoencoder_gan():
                   % (epoch, args.epochs, i, len(train_loader),
                      err_discriminator.data[0], err_generator.data[0], d_x, d_g_z1, d_g_z2))
             if i % 100 == 0:
-                vutils.save_image(image,
-                                  '%s/real_samples.png' % args.output_dir,
-                                  normalize=True)
+
+                test_data, _ = [a for a in test_loader][0]
+                if args.cuda:
+                    test_data = test_data.cuda()
+                image_tensor.resize_as_(test_data).copy_(test_data)
+                mask.resize_as_(test_data).fill_(1.)
+                mask[:, :, (args.image_size - mask_w) // 2:(args.image_size + mask_w) // 2,
+                (args.image_size - mask_h) // 2:(args.image_size + mask_h) // 2] = 0.
+                masked_image_var = Variable(image_tensor * mask + (1-mask)*image_tensor.mean())
                 fake = generator(masked_image_var)
-                vutils.save_image(fake.data,
-                                  '%s/fake_samples_epoch_%03d.png' % (args.output_dir, epoch),
-                                  normalize=True)
                 masked = image_tensor * mask + fake.data.clamp(0,1) * (1-mask)
-                vutils.save_image(masked,
-                                  '%s/reconstructed_samples_epoch_%03d.png' % (args.output_dir, epoch),
-                                  normalize=True)
+
+                #only ouput batchsize images
+                vutils.save_image(test_data[0:args.batch_size],
+                                    '%s/real_samples.png' % args.output_dir,
+                                    normalize=True)
+                vutils.save_image(fake.data[0:args.batch_size],
+                                    '%s/fake_samples_epoch_%03d.png' % (args.output_dir, epoch),
+                                    normalize=True)
+                vutils.save_image(masked[0:args.batch_size],
+                                    '%s/reconstructed_samples_epoch_%03d.png' % (args.output_dir, epoch),
+                                    normalize=True)
 
     torch.save(generator.state_dict(), '%s/netG_epoch_%d.pth' % (args.output_dir, epoch))
     torch.save(discriminator.state_dict(), '%s/netD_epoch_%d.pth' % (args.output_dir, epoch))
 
-def train():
+def train_dcgan():
     criterion = nn.BCELoss()
 
     image_tensor = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size)
@@ -234,7 +243,10 @@ def train():
     torch.save(discriminator.state_dict(), '%s/netD_epoch_%d.pth' % (args.output_dir, epoch))
 
 
-def complete():
+def complete_context_encoder():
+    pass
+
+def complete_dcgan():
     n_samples = 100
     lbd = 0.1
     image_to_complete = dataset[50][0]
@@ -316,28 +328,30 @@ if __name__ == '__main__':
     # Creating networks
     print('Creating networks')
 
-    generator = GeneratorNet64()
-    discriminator = DiscriminatorNet64()
+    if args.method == 'context-encoder':
+        generator = AutoEncoder()
+        discriminator = discriminator_net(args.image_size)
+    elif args.method == 'dcgan':
+        generator = generator_net(args.image_size)
+        discriminator = discriminator_net(args.image_size)
 
     if args.mode == 'train':
         generator.to_tune().apply(weights_init)
         discriminator.to_tune().apply(weights_init)
-        print(generator)
-        print(discriminator)
-        train()
     elif args.mode == 'complete':
-        epoch = 39
-        generator.load_state_dict(torch.load(f"out/netG_epoch_{epoch}.pth"))
-        discriminator.load_state_dict(torch.load(f"out/netD_epoch_{epoch}.pth"))
-        print(generator)
-        print(discriminator)
-        complete()
-    elif args.mode == 'cacestmoche':
-        generator = AutoEncoder()
-        discriminator = DiscriminatorNet64()
+        generator.load_state_dict(torch.load('%s/%s.pth' % (args.output_dir, args.generator_model_name)))
+        discriminator.load_state_dict(torch.load('%s/%s.pth' % (args.output_dir, args.discriminator_model_name)))
 
-        generator.to_tune().apply(weights_init)
-        discriminator.to_tune().apply(weights_init)
-        print(generator)
-        print(discriminator)
-        train_autoencoder_gan()
+    print(generator)
+    print(discriminator)
+
+    if args.method == 'context-encoder':
+        if args.mode == 'train':
+            train_context_encoder()
+        elif args.mode == 'complete':
+            complete_context_encoder()
+    elif args.method == 'dcgan':
+        if args.mode == 'train':
+            train_dcgan()
+        elif args.mode == 'complete':
+            complete_dcgan()

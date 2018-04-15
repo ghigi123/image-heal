@@ -4,7 +4,7 @@ from torch.autograd import Variable
 from torchvision import datasets, transforms
 import random as rd
 import os
-
+import math
 
 def parse_args():
     # Training settings
@@ -26,6 +26,10 @@ def parse_args():
                         help='how many batches to wait before logging training status')
     parser.add_argument('--data-path', default='data/faces/raw', help='relative path to a folder containing a folder containing images to learn from')
     parser.add_argument('--image-size', type=int, default=64, help='image will be resized to this size')
+    parser.add_argument('--method', default='context-encoder', help='which method to use (context-encoder or dcgan)')
+    parser.add_argument('--discriminator-model-name', default='discriminator')
+    parser.add_argument('--generator-model-name', default = 'generator')
+    parser.add_argument('--mask-size', type=int, default = 32, help="size of the mask used for inpainting")
 
     args = parser.parse_args()
 
@@ -54,7 +58,18 @@ def weights_init(m):
         m.bias.data.fill_(0)
 
 
-def dataset_loaders(args):
+class SubsetSampler(torch.utils.data.sampler.Sampler):
+
+    def __init__(self, indices):
+        self.indices = indices
+
+    def __iter__(self):
+        return (i for i in self.indices)
+
+    def __len__(self):
+        return len(self.indices)
+
+def dataset_loaders(args, train_frac = 0.95):
     dataset = datasets.ImageFolder(args.data_path, transforms.Compose([
         transforms.Resize([args.image_size, args.image_size]),
         transforms.ToTensor()
@@ -65,12 +80,11 @@ def dataset_loaders(args):
     kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
     train_loader = torch.utils.data.DataLoader(
         dataset,
-        batch_size=args.batch_size, shuffle=True, **kwargs)
+        batch_size=args.batch_size, shuffle=False, sampler=torch.utils.data.sampler.SubsetRandomSampler(range(math.floor(len(dataset) * train_frac))), **kwargs)
     test_loader = torch.utils.data.DataLoader(
         dataset,
-        batch_size=args.test_batch_size, shuffle=True, **kwargs)
+        batch_size=len(dataset) - math.floor(len(dataset) * train_frac), shuffle=False, sampler=SubsetSampler(range(math.floor(len(dataset) * train_frac), len(dataset))), **kwargs)
     return dataset, train_loader, test_loader
-
 
 def build_mask(im_size, width, height, position='center'):
     im_width, im_height = im_size
