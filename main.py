@@ -98,8 +98,12 @@ def train_context_encoder():
 
             generator.to_tune().zero_grad()
 
+            # l2 loss
+
             err_l2 = l2_criterion(fake, image_var) * 0.999
             err_l2.backward(retain_graph=True)
+
+            # adversarial loss
 
             label.fill_(real_label)
             label_var = Variable(label)
@@ -108,6 +112,8 @@ def train_context_encoder():
             err_adv = criterion(output, label_var) * 0.001
             err_adv.backward()
 
+            # total loss
+            
             err_generator = err_l2 + err_adv
 
             d_g_z2 = output.data.mean()
@@ -175,8 +181,6 @@ def train_dcgan():
         for i, data in enumerate(train_loader):
             ### update discriminator
 
-            ip = len(train_loader) * epoch + i
-
             # on a real sample
             discriminator.to_tune().zero_grad()
             image, _ = data
@@ -185,6 +189,9 @@ def train_dcgan():
             image_tensor.resize_as_(image).copy_(image)
             label.resize_(image.size(0)).fill_(real_label)
 
+            # This can be enabled to help discriminator to converge, mixing input with progressively dissapearing noise
+
+            # ip = len(train_loader) * epoch + i
             # image_noise.resize_as_(image).normal_(0.0, 1.0)
             # if ip < total_samples:
             #    image_tensor = image_tensor * (0.5 + 0.5 * ip / total_samples) + image_noise * (0.5 - 0.5 * ip/total_samples)
@@ -284,14 +291,19 @@ def complete_context_encoder():
     print('images written in %s' % (args.output_dir))
 
 def complete_dcgan():
+    # number of random z vector samples for every image
     n_samples = 10
-    lbd = 0.3
+    # to be parametrized
+    # lambda to mix contextual and perceptual losses
+    # to be parametrized
+    lbd = 0.1
 
     batch_to_complete, _ = [a for a in test_loader][0]
     print(batch_to_complete)
     reconstructed_images = torch.FloatTensor(batch_to_complete.size())
     masked_images = torch.FloatTensor(batch_to_complete.size())
 
+    # generate a whole batch
     for j in range(batch_to_complete.size(0)):
         image_to_complete = batch_to_complete[j]
         image_to_complete = image_to_complete.resize_(1, 3, args.image_size, args.image_size).repeat(n_samples, 1, 1, 1)
@@ -332,18 +344,27 @@ def complete_dcgan():
         for param in discriminator.parameters():
             param.requires_grad = False
 
+        # amount of optimzation steps
+        # to be parametrized
         n_iter = 2000
 
         for i in range(n_iter):
+
+            # contextual loss
+
             generated = generator(base_noise_var)
 
             ctx_loss = contextual_loss(generated * mask_var, image_to_complete_var * mask_var)
 
             ctx_loss = torch.mean(torch.mean(torch.mean(ctx_loss, 1), 1), 1)
 
+            # perceptual loss
+
             rating = discriminator(generated)
 
             pcpt_loss = torch.pow(rating - label_var, 2)
+
+            # total loss
 
             total_loss = ctx_loss + lbd * pcpt_loss
 
@@ -359,8 +380,6 @@ def complete_dcgan():
 
         reconstructed_images[j] = reconstructed.data[idces]
         masked_images[j] = image_to_complete[idces]
-
-        vutils.save_image(reconstructed_images[j], f'{args.output_dir}/haha.png')
 
 
     vutils.save_image(masked_images, f'{args.output_dir}/source.png')
