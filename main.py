@@ -6,6 +6,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 
+import numpy as np
+
 import torchvision.utils as vutils
 
 # import custom models
@@ -164,7 +166,7 @@ def train_dcgan():
 
     fixed_noise = Variable(fixed_noise)
 
-    generator_optimizer = optim.Adam(generator.to_tune().parameters(), lr=0.0002, betas=(0.5, 0.999))
+    generator_optimizer = optim.Adam(generator.to_tune().parameters(), lr=0.002, betas=(0.5, 0.999))
     discriminator_optimizer = optim.Adam(discriminator.to_tune().parameters(), lr=0.0002, betas=(0.5, 0.999))
 
     total_samples = args.epochs * len(train_loader) / 10
@@ -235,7 +237,7 @@ def train_dcgan():
                                   '%s/real_samples.png' % args.output_dir,
                                   normalize=True)
                 fake = generator(fixed_noise)
-                vutils.save_image(fake.data,
+                vutils.save_image(fake.data.clamp(0,1),
                                   '%s/fake_samples_epoch_%03d.png' % (args.output_dir, epoch),
                                   normalize=True)
 
@@ -247,81 +249,87 @@ def complete_context_encoder():
     pass
 
 def complete_dcgan():
-    n_samples = 100
-    lbd = 0.1
-    image_to_complete = dataset[50][0]
-    image_to_complete = image_to_complete.resize_(1, 3, args.image_size, args.image_size).repeat(n_samples, 1, 1, 1)
-    mask_w = 26
-    mask_h = 26
-    centered_mask = torch.FloatTensor(n_samples, 3, args.image_size, args.image_size).fill_(1.)
-    centered_mask[:, :, (args.image_size - mask_w) // 2:(args.image_size + mask_w) // 2,
-    (args.image_size - mask_h) // 2:(args.image_size + mask_h) // 2] = 0.
-    mask = centered_mask
-    base_noise = torch.FloatTensor(n_samples, 100, 1, 1).normal_(0.0, 1.0)
-    label = torch.FloatTensor(n_samples, 1).fill_(1.)
+    n_samples = 10
+    lbd = 0.3
 
-    contextual_loss = nn.SmoothL1Loss(reduce=False)
-    perceptual_loss = nn.MSELoss(reduce=False)
+    batch_to_complete, _ = [a for a in test_loader][0]
+    print(batch_to_complete)
+    reconstructed_images = torch.FloatTensor(batch_to_complete.size())
+    masked_images = torch.FloatTensor(batch_to_complete.size())
 
-    if args.cuda:
-        contextual_loss.cuda()
-        perceptual_loss.cuda()
+    for j in range(batch_to_complete.size(0)):
+        image_to_complete = batch_to_complete[j]
+        image_to_complete = image_to_complete.resize_(1, 3, args.image_size, args.image_size).repeat(n_samples, 1, 1, 1)
 
-        discriminator.cuda()
-        generator.cuda()
+        mask_w = args.mask_size
+        mask_h = args.mask_size
 
-        label = label.cuda()
-        base_noise = base_noise.cuda()
-        mask = mask.cuda()
-        image_to_complete = image_to_complete.cuda()
+        centered_mask = torch.FloatTensor(n_samples, 3, args.image_size, args.image_size).fill_(1.)
+        centered_mask[:, :, (args.image_size - mask_w) // 2:(args.image_size + mask_w) // 2,
+        (args.image_size - mask_h) // 2:(args.image_size + mask_h) // 2] = 0.
+        mask = centered_mask
+        base_noise = torch.FloatTensor(n_samples, 100, 1, 1).normal_(0.0, 1.0)
+        label = torch.FloatTensor(n_samples).fill_(1.)
 
-    label_var = Variable(label)
-    base_noise_var = Variable(base_noise)
-    base_noise_var.requires_grad = True
-    mask_var = Variable(mask)
-    image_to_complete_var = Variable(image_to_complete)
+        contextual_loss = nn.SmoothL1Loss(reduce=False)
 
-    optimizer = optim.Adam([base_noise_var], lr=0.002, betas=(0.5, 0.999))
+        if args.cuda:
+            contextual_loss.cuda()
 
-    for param in generator.parameters():
-        param.requires_grad = False
-    for param in discriminator.parameters():
-        param.requires_grad = False
+            discriminator.cuda()
+            generator.cuda()
 
-    n_iter = 300
+            label = label.cuda()
+            base_noise = base_noise.cuda()
+            mask = mask.cuda()
+            image_to_complete = image_to_complete.cuda()
 
-    for i in range(n_iter):
-        generated = generator(base_noise_var)
+        label_var = Variable(label)
+        base_noise_var = Variable(base_noise)
+        base_noise_var.requires_grad = True
+        mask_var = Variable(mask)
+        image_to_complete_var = Variable(image_to_complete)
 
-        ctx_loss = contextual_loss(generated * mask_var, image_to_complete_var * mask_var)
-        ctx_loss = torch.mean(torch.mean(torch.mean(ctx_loss, 1), 1), 1)
+        optimizer = optim.Adam([base_noise_var], lr=0.01, betas=(0.9, 0.999))
 
-        print(f'ctx_loss size : {ctx_loss.size()}')
+        for param in generator.parameters():
+            param.requires_grad = False
+        for param in discriminator.parameters():
+            param.requires_grad = False
 
-        rating = discriminator(generated)
-        pcpt_loss = perceptual_loss(rating, label_var)
+        n_iter = 2000
 
-        print(f'pcpt_loss size : {pcpt_loss.size()}')
+        for i in range(n_iter):
+            generated = generator(base_noise_var)
 
-        total_loss = ctx_loss + lbd * pcpt_loss
+            ctx_loss = contextual_loss(generated * mask_var, image_to_complete_var * mask_var)
 
-        print(f'total_loss size : {total_loss.size()}')
+            ctx_loss = torch.mean(torch.mean(torch.mean(ctx_loss, 1), 1), 1)
 
-        total_loss.mean().backward()
+            rating = discriminator(generated)
 
-        print('[%d/%d] Ctx_loss : %.4f, Pcpt_loss : %.4f, Total_loss : %.4f' % (
-        i + 1, n_iter, ctx_loss.data[0], pcpt_loss.data[0], total_loss.data[0]))
-        optimizer.step()
+            pcpt_loss = torch.pow(rating - label_var, 2)
 
-        reconstructed = mask_var * image_to_complete_var + (1.0 - mask_var) * generated
+            total_loss = ctx_loss + lbd * pcpt_loss
 
-    _, idces = total_loss.data.min(0)
+            total_loss.mean().backward()
 
-    print(idces)
+            print('[%d/%d] Ctx_loss : %.4f, Pcpt_loss : %.4f, Total_loss : %.4f' % (
+            i + 1, n_iter, ctx_loss.data[0], pcpt_loss.data[0], total_loss.data[0]))
+            optimizer.step()
 
-    vutils.save_image(generated.data[idces], f'{args.output_dir}/generated.png')
-    vutils.save_image(image_to_complete[idces], f'{args.output_dir}/source.png')
-    vutils.save_image(reconstructed.data[idces], f'{args.output_dir}/reconstructed.png')
+            reconstructed = mask_var * image_to_complete_var + (1.0 - mask_var) * generated.clamp(0,1)
+
+        _, idces = total_loss.data.min(0)
+
+        reconstructed_images[j] = reconstructed.data[idces]
+        masked_images[j] = image_to_complete[idces]
+
+        vutils.save_image(reconstructed_images[j], f'{args.output_dir}/haha.png')
+
+
+    vutils.save_image(masked_images, f'{args.output_dir}/source.png')
+    vutils.save_image(reconstructed_images, f'{args.output_dir}/reconstructed.png')
 
 
 if __name__ == '__main__':
@@ -335,6 +343,9 @@ if __name__ == '__main__':
         generator = generator_net(args.image_size)
         discriminator = discriminator_net(args.image_size)
 
+    print(generator)
+    print(discriminator)
+
     if args.mode == 'train':
         generator.to_tune().apply(weights_init)
         discriminator.to_tune().apply(weights_init)
@@ -342,8 +353,6 @@ if __name__ == '__main__':
         generator.load_state_dict(torch.load('%s/%s.pth' % (args.output_dir, args.generator_model_name)))
         discriminator.load_state_dict(torch.load('%s/%s.pth' % (args.output_dir, args.discriminator_model_name)))
 
-    print(generator)
-    print(discriminator)
 
     if args.method == 'context-encoder':
         if args.mode == 'train':

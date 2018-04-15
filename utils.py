@@ -69,7 +69,7 @@ class SubsetSampler(torch.utils.data.sampler.Sampler):
     def __len__(self):
         return len(self.indices)
 
-def dataset_loaders(args, train_frac = 0.95):
+def dataset_loaders(args, train_frac = 0.99):
     dataset = datasets.ImageFolder(args.data_path, transforms.Compose([
         transforms.Resize([args.image_size, args.image_size]),
         transforms.ToTensor()
@@ -83,7 +83,7 @@ def dataset_loaders(args, train_frac = 0.95):
         batch_size=args.batch_size, shuffle=False, sampler=torch.utils.data.sampler.SubsetRandomSampler(range(math.floor(len(dataset) * train_frac))), **kwargs)
     test_loader = torch.utils.data.DataLoader(
         dataset,
-        batch_size=len(dataset) - math.floor(len(dataset) * train_frac), shuffle=False, sampler=SubsetSampler(range(math.floor(len(dataset) * train_frac), len(dataset))), **kwargs)
+        batch_size=args.batch_size, shuffle=False, sampler=SubsetSampler(range(math.floor(len(dataset) * train_frac), len(dataset))), **kwargs)
     return dataset, train_loader, test_loader
 
 def build_mask(im_size, width, height, position='center'):
