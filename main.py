@@ -29,8 +29,8 @@ def train_autoencoder_gan():
     criterion = nn.BCELoss()
     l2_criterion = nn.MSELoss()
 
-    mask_w = 26
-    mask_h = 26
+    mask_w = 60
+    mask_h = 60
 
     image_tensor = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size)
     mask = torch.FloatTensor(args.batch_size, 3, args.image_size, args.image_size)
@@ -78,7 +78,7 @@ def train_autoencoder_gan():
 
             # on a fake sample
 
-            masked_image_var = Variable(image_tensor * mask)
+            masked_image_var = Variable(image_tensor * mask + (1-mask)*image_tensor.mean())
             fake = generator(masked_image_var)
 
             label.fill_(fake_label)
@@ -335,6 +335,7 @@ if __name__ == '__main__':
     elif args.mode == 'cacestmoche':
         generator = AutoEncoder()
         discriminator = DiscriminatorNet64()
+
         generator.to_tune().apply(weights_init)
         discriminator.to_tune().apply(weights_init)
         print(generator)
