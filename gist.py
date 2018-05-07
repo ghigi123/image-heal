@@ -38,7 +38,7 @@ def build_gist(image_size, scales=4, orientations=8, kernel_size=5):
         nn.AvgPool2d(pooling_step, stride=pooling_step)
     )
 
-    return gist
+    return lambda x: gist(x).view((x.size()[0], -1))
 
 
 if __name__ == '__main__':
@@ -50,4 +50,4 @@ if __name__ == '__main__':
     tensor[:, 2] *= 3
     tensor[:, :, 16:, 16:] *= 0
     print(tensor)
-    print(gist(tensor).size())
+    print(gist(tensor))
