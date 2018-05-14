@@ -2,6 +2,7 @@ import argparse
 import torch
 from torch.autograd import Variable
 from torchvision import datasets, transforms
+from dataset_utils import ImageFolderBatchable
 import random as rd
 import os
 import math
@@ -75,7 +76,7 @@ class SubsetSampler(torch.utils.data.sampler.Sampler):
 
 def dataset_loaders(args, train_frac = 0.99):
     # Load the different datasets, resize images and transform them into tensors
-    dataset = datasets.ImageFolder(args.data_path, transforms.Compose([
+    dataset = ImageFolderBatchable(args.data_path, transforms.Compose([
         transforms.Resize([args.image_size, args.image_size]),
         transforms.ToTensor()
     ]))
