@@ -17,12 +17,4 @@ class ImageFolderBatchable(ImageFolder):
     def __init__(self, root, transform=None, target_transform=None):
         super().__init__(root, transform, target_transform)
         self.paths = ListView(self.samples, itemgetter(0), list)
-        self.images = ListView(self.paths, lambda path: self.transform(self.loader(path)), lambda seq: torch.stack(list(seq), dim=0))
-
-
-
-if __name__ == '__main__':
-    from string import ascii_lowercase
-    a = list(enumerate(ascii_lowercase))
-    print(a)
-    print(zip(*a))
+        self.images = ListView(self.samples, lambda sample: self.transform(self.loader(sample[0])), lambda seq: torch.stack(list(seq), dim=0))
