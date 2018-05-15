@@ -1,6 +1,6 @@
 from struct import pack, unpack, Struct
 from os import path
-import torch
+
 
 class VectorWriter:
     def __init__(self, filename, vector_size):
@@ -8,22 +8,35 @@ class VectorWriter:
         self._vector_size = vector_size
         self._vector_pack = Struct(f'{vector_size}f').pack
         self._file = None
+        self._default_id = 0
+        self._ids = None
 
     def __enter__(self):
-        self._file = open(self._filename, 'wb')
+        self._file = open(f'{self._filename}.db.binary', 'wb')
+        self._ids = open(f'{self._filename}.db.txt', 'w')
         self._file.write(pack('I', self._vector_size))
         return self
 
-    def write_batch(self, batch):
-        write = self.write
-        for vector in batch:
-            write(vector)
+    def write_batch(self, batch_vectors, batch_ids=None):
+        if batch_ids is None:
+            id_start = self._default_id
+            self._default_id += len(batch_vectors)
+            batch_ids = range(id_start, self._default_id)
 
-    def write(self, vector):
+        for vector in batch_vectors:
+            self._file.write(self._vector_pack(*vector))
+
+        self._ids.write('\n'.join(str(id_) for id_ in batch_ids) + '\n')
+
+    def write(self, vector, id=None):
+        if id is None:
+            self._ids.write(f'{self._default_id}\n')
+            self._default_id += 1
         self._file.write(self._vector_pack(*vector))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._file.close()
+        self._ids.close()
 
 
 class VectorReader:
@@ -33,13 +46,16 @@ class VectorReader:
         self._vector_unpack = None
         self._file = None
         self._n = None
+        self.ids = None
 
     def __enter__(self):
-        self._file = open(self._filename, 'rb')
+        self._file = open(f'{self._filename}.db.binary', 'rb')
+        with open(f'{self._filename}.db.txt', 'r') as f:
+            self.ids = [id_.strip() for id_ in f.readlines()]
 
         self._vector_size, = unpack('I', self._file.read(4))
         self._vector_unpack = Struct(f'{self._vector_size}f').unpack
-        self._n = (path.getsize(self._filename) - 4) // (4 * self._vector_size)
+        self._n = (path.getsize(f'{self._filename}.db.binary') - 4) // (4 * self._vector_size)
 
         return self
 
@@ -64,7 +80,7 @@ class VectorReader:
 if __name__ == '__main__':
     import torch
     from time import time
-    with VectorWriter('test.test', 40) as vw:
+    with VectorWriter('out/test', 40) as vw:
         tensor = torch.randn(40)
         print(tensor)
         vw.write(tensor)
@@ -76,9 +92,10 @@ if __name__ == '__main__':
             vw.write_batch(tensor)
         print((time() - t) / n)
 
-    with VectorReader('test.test') as vr:
+    with VectorReader('out/test') as vr:
         v0 = vr.read(0)
         print(vr.read(3))
         v0b = vr.read(0)
         assert all(v0[i] == v0b[i] for i in range(len(v0)))
         print(vr[2:5])
+        print(vr.ids[:50])
