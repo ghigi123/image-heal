@@ -1,6 +1,6 @@
 from struct import pack, unpack, Struct
 from os import path
-
+import torch
 
 class VectorWriter:
     def __init__(self, filename, vector_size):
@@ -75,6 +75,9 @@ class VectorReader:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._file.close()
+
+    def __len__(self):
+        return self._n
 
 
 if __name__ == '__main__':
