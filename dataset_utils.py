@@ -1,7 +1,6 @@
 from torchvision.datasets import ImageFolder
 import torch
 from operator import itemgetter
-from functools import partial
 
 class ListView:
     def __init__(self, l, view_func, container):
@@ -18,3 +17,8 @@ class ImageFolderBatchable(ImageFolder):
         super().__init__(root, transform, target_transform)
         self.paths = ListView(self.samples, itemgetter(0), list)
         self.images = ListView(self.samples, lambda sample: self.transform(self.loader(sample[0])), lambda seq: torch.stack(list(seq), dim=0))
+
+    def batches(self, n=64):
+        for i in range(0, len(self.samples), n):
+            yield self.paths[i: i+n], self.images[i: i+n]
+
