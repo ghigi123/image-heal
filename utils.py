@@ -103,6 +103,12 @@ def build_mask(im_size, width, height, position='center'):
         cx, cy = im_width / 2, im_height / 2
     elif position == 'random':
         cx, cy = rd.randint(0, im_width - 1), rd.randint(0, im_height - 1)
+    elif position == 'multiple':
+        for i in range(5):
+            cx, cy = rd.randint(0, im_width - 1), rd.randint(0, im_height - 1)
+            mask[max(int(cx - width / 2), 0): min(int(cx + width / 2), im_width - 1),
+            max(int(cy - height / 2), 0): min(int(cy + height / 2), im_height - 1)] = 1
+        return Variable(mask, requires_grad=False)
     elif isinstance(position, tuple):
         cx, cy = position
     else:
