@@ -73,6 +73,11 @@ class VectorReader:
         else:
             return self.read(item)
 
+    def hashes(self):
+        self._file.seek(4)
+        for i in range(len(self)):
+            yield self._file.read(4 * self._vector_size)
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._file.close()
 

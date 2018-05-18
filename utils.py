@@ -7,6 +7,14 @@ import random as rd
 import os
 import math
 
+_origin_dir = os.path.abspath(os.path.dirname(__file__))
+
+
+def resolve(path):
+    if path[0] == '/':
+        raise ValueError(f'The given path {path} is probably an absolute path from root.')
+    return os.path.join(_origin_dir, path)
+
 
 def parse_args():
     # Parse settings from the CLI
@@ -33,6 +41,12 @@ def parse_args():
     parser.add_argument('--discriminator-model-name', default='discriminator')
     parser.add_argument('--generator-model-name', default = 'generator')
     parser.add_argument('--mask-size', type=int, default = 32, help="size of the mask used for inpainting")
+    parser.add_argument('--naive', dest='naive', action='store_true')
+    parser.add_argument('--no-naive', dest='naive', action='store_false')
+    parser.set_defaults(naive=True)
+    parser.add_argument('--lsh', dest='lsh', action='store_true')
+    parser.add_argument('--no-lsh', dest='lsh', action='store_false')
+    parser.set_defaults(lsh=True)
 
     args = parser.parse_args()
 
