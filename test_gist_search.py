@@ -29,7 +29,7 @@ if __name__ == '__main__':
     print('Loading images', time() - t0)
     t0 = time()
 
-    filename = f'{args.data_path}_gists'
+    filename = f'out/{args.data_path.split("/")[-1]}_gists'
 
     if not os.path.exists(f'{filename}.db.binary'):
         build_descriptor_database(dataset.batches(100), gist, 512, filename)
