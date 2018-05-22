@@ -1,6 +1,8 @@
 from torchvision.datasets import ImageFolder
 import torch
 from operator import itemgetter
+from collections import Iterable
+
 
 class ListView:
     def __init__(self, l, view_func, container):
@@ -9,7 +11,11 @@ class ListView:
         self._container = container
 
     def __getitem__(self, item):
-        return self._container(self._view_func(element) for element in self._list[item])
+        if isinstance(item, slice):
+            return self._container(self._view_func(element) for element in self._list[item])
+        if isinstance(item, Iterable):
+            return self._container(self._view_func(self._list[idx]) for idx in item)
+        return self._container([self._view_func(self._list[item])])
 
 
 class ImageFolderBatchable(ImageFolder):

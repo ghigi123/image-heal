@@ -58,8 +58,6 @@ def parse_args():
     if args.cuda:
         torch.cuda.manual_seed(args.seed)
 
-    args.data_path = os.path.abspath(args.data_path)
-
     return args
 
 
