@@ -3,17 +3,20 @@ import torch
 from skimage.filters import gabor_kernel
 import numpy as np
 
+SPATIAL_RESOLUTION = 4
 
-def build_gist(image_size, scales=4, orientations=8, kernel_size=5):
+def build_gist(image_size, scales=(.81, .90, 1), orientations=8, kernel_size=None):
     input_channels, width, height = image_size
 
-    if width % 4 !=0 or height % 4 != 0:
-        raise ValueError('Image width or height are not divisible by 4.')
+    if width % SPATIAL_RESOLUTION !=0 or height % SPATIAL_RESOLUTION != 0:
+        raise ValueError(f'Image width or height are not divisible by {SPATIAL_RESOLUTION}.')
 
-    gabor_filters = [gabor_kernel((scale + 1) * 0.1, orientation / orientations * np.pi).real
-                     for scale in range(scales)
+    gabor_filters = [gabor_kernel(scale, orientation / orientations * np.pi).real
+                     for scale in scales
                      for orientation in range(orientations)]
 
+    if kernel_size is None:
+        kernel_size = min(filter.shape[0] for filter in gabor_filters)
     kernels = []
     for filter in gabor_filters:
         w, h = filter.shape
@@ -33,7 +36,7 @@ def build_gist(image_size, scales=4, orientations=8, kernel_size=5):
     else:
         padl, padr = pad, pad + 1
 
-    pooling_step = (width // 4, height // 4)
+    pooling_step = (width // SPATIAL_RESOLUTION, height // SPATIAL_RESOLUTION)
 
     _gist = nn.Sequential(
         nn.ReflectionPad2d((padl, padr, padl, padr)),
@@ -41,8 +44,20 @@ def build_gist(image_size, scales=4, orientations=8, kernel_size=5):
         nn.AvgPool2d(pooling_step, stride=pooling_step)
     )
 
-    def gist(tensor):
-        return _gist(tensor).view((tensor.size()[0], -1))
+    features_number = len(gabor_filters)
+
+    def gist(tensor, blanks=None):
+
+        descriptors = _gist(tensor).view((tensor.size()[0], -1))
+
+        if blanks is not None:
+            for i, j in blanks:
+                start = (i * SPATIAL_RESOLUTION + j) * features_number
+                descriptors[:, start:start + features_number] = 0
+
+        return descriptors
+
+    gist.features_number = features_number * SPATIAL_RESOLUTION ** 2
 
     return gist
 
