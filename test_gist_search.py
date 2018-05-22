@@ -46,9 +46,15 @@ if __name__ == '__main__':
 
     with VectorReader(filename) as vr:
 
-        def search(image, n):
-            im_gist = gist(torch.stack([image], 0))
-            return (vr[:int(len(vr) * 0.8)] - im_gist).norm(2, 1).topk(n, largest=False)[1]
+        def search(image, n, blanks=None):
+            im_gist_diff = (vr[:int(len(vr) * 0.8)] - gist(image))
+
+            if blanks is not None:
+                for i, j in blanks:
+                    start = (i * 4 + j) * gist.filters_number
+                    im_gist_diff[:, start:start + gist.filters_number] = 0
+
+            return im_gist_diff.norm(2, 1).topk(n, largest=False)[1]
 
         print('Building gists', time() - t0)
 
@@ -58,8 +64,8 @@ if __name__ == '__main__':
                 t0 = time()
 
                 new_idx = rd.randint(int(len(vr) * 0.8), len(vr) - 1)
-                new_image, _ = dataset[new_idx]
-                idxs = search(new_image, 23)
+                blanks = [(0, 0), (0, 1)]
+                idxs = search(dataset.images[new_idx], 23, blanks)
 
                 print('Searching nearest', time() - t0)
 

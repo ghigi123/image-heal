@@ -44,20 +44,11 @@ def build_gist(image_size, scales=(.81, .90, 1), orientations=8, kernel_size=Non
         nn.AvgPool2d(pooling_step, stride=pooling_step)
     )
 
-    features_number = len(gabor_filters)
+    def gist(tensor):
+        return _gist(tensor).view((tensor.size()[0], -1))
 
-    def gist(tensor, blanks=None):
-
-        descriptors = _gist(tensor).view((tensor.size()[0], -1))
-
-        if blanks is not None:
-            for i, j in blanks:
-                start = (i * SPATIAL_RESOLUTION + j) * features_number
-                descriptors[:, start:start + features_number] = 0
-
-        return descriptors
-
-    gist.features_number = features_number * SPATIAL_RESOLUTION ** 2
+    gist.filters_number = len(gabor_filters)
+    gist.features_number = len(gabor_filters) * SPATIAL_RESOLUTION ** 2
 
     return gist
 
