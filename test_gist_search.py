@@ -1,4 +1,4 @@
-from gist import build_gist
+from gist import build_gist, get_masked_areas
 from utils import parse_args, dataset_loaders, resolve
 import torch
 from time import time
@@ -6,8 +6,8 @@ import os
 import torchvision.utils as vutils
 from vector_store import VectorWriter, VectorReader
 import random as rd
-import datasketch
 from struct import pack
+from shutil import copyfile
 
 
 def build_descriptor_database(data, descriptor, descriptor_size, filename):
@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     with VectorReader(filename) as vr:
 
-        def search(image, n, blanks=None):
+        def search(image, n=200, blanks=None):
             im_gist_diff = (vr[:int(len(vr) * 0.8)] - gist(image))
 
             if blanks is not None:
@@ -64,12 +64,22 @@ if __name__ == '__main__':
                 t0 = time()
 
                 new_idx = rd.randint(int(len(vr) * 0.8), len(vr) - 1)
-                blanks = [(0, 0), (0, 1)]
-                idxs = search(dataset.images[new_idx], 23, blanks)
+                mask = torch.ones(dataset.images[new_idx].size()[1:])
+                mask[:, :im_size[1] // 4, :] = 0
+                vutils.save_image(mask, 'default_mask.jpg')
+                assert get_masked_areas(mask) == [(0, 0), (0, 1), (0, 2), (0, 3)]
+
+                idxs = search(dataset.images[new_idx], blanks=get_masked_areas(mask))
+                paths = dataset.paths[[new_idx] + list(idxs[:40])]
+                for i, path in enumerate(paths):
+                    fn = os.path.split(path)[-1]
+                    copyfile(path, os.path.join('./out/ex/', f'{i}_{fn}'))
+                exit()
+
 
                 print('Searching nearest', time() - t0)
 
-                vutils.save_image(dataset.images[[new_idx] + list(idxs)],
+                vutils.save_image(dataset.images[[new_idx] + list(idxs[:23])],
                                     '%s/%s_test_naive.png' % (args.output_dir, i),
                                     normalize=True)
         if args.lsh:

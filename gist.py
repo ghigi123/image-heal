@@ -5,8 +5,22 @@ import numpy as np
 
 SPATIAL_RESOLUTION = 4
 
+def get_masked_areas(mask, masked_ratio=0.3):
+    input_channels, height, width = mask.size()
+    w_step, h_step = width // SPATIAL_RESOLUTION, height // SPATIAL_RESOLUTION
+    area_pixels_threshold = input_channels * w_step * h_step * masked_ratio
+
+    
+    masked_areas = []
+
+    for i in range(4):
+        for j in range(4):
+            if mask[:, i * h_step:(i + 1) * h_step, j * w_step:(j + 1) * w_step].sum() <= area_pixels_threshold:
+                masked_areas.append((i, j))
+    return masked_areas
+
 def build_gist(image_size, scales=(.81, .90, 1), orientations=8, kernel_size=None):
-    input_channels, width, height = image_size
+    input_channels, height, width = image_size
 
     if width % SPATIAL_RESOLUTION !=0 or height % SPATIAL_RESOLUTION != 0:
         raise ValueError(f'Image width or height are not divisible by {SPATIAL_RESOLUTION}.')
@@ -55,11 +69,9 @@ def build_gist(image_size, scales=(.81, .90, 1), orientations=8, kernel_size=Non
 
 if __name__ == '__main__':
     im_size = 3, 32, 32
-    gist = build_gist(im_size, kernel_size=7)
-    tensor = torch.Tensor(np.ones((2, *im_size)))
+    gist = build_gist(im_size)
+    tensor = torch.randn((2, *im_size))
     tensor[1] *= 2
     tensor[:, 1] *= 2
     tensor[:, 2] *= 3
     tensor[:, :, 16:, 16:] *= 0
-    print(tensor)
-    print(gist(tensor))
