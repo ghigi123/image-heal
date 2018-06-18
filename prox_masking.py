@@ -40,35 +40,50 @@ def get_prox_op(image_size, kernel_size=25):
     return get_prox
 
 
-def _mse(searched_images, found_image):
-    return (searched_images - found_image).pow(2).sum(3).argmin()
+def _mse(searched_image, found_images):
+    return (searched_image - found_images).pow(2).sum(2).sum(2).sum(2)
 
 
-def build_ssd(searched_images):
-    n_searched_images, input_channels, width, height = searched_images.size()
-    block_width, block_height = width // SPATIAL_RESOLUTION, height // SPATIAL_RESOLUTION
-    translated_images = torch.stack([torch.stack([searched_images[:, :, i:, j:] -  n for i in range(block_height)]) for j in range(block_width)]).permute(2, 0, 1, 3, 4, 5)
+def build_translated(image, max_i, max_j):
+    chan, height, width = image.size()
+    boundary_image = torch.zeros_like(image)
+    for i in range(height):
+        for j in range(width):
+            if i >= j:
+                boundary_image[:, i, j] = image[:, i, 0]
+            else:
+                boundary_image[:, i, j] = image[:, 0, j]
 
-    def best_translation(found_image):
-        return _mse(translated_images, found_image)
+    images = boundary_image.unsqueeze(0).unsqueeze(1).repeat(max_i, max_j, 1, 1, 1)
+    for i in range(max_i):
+        for j in range(max_j):
+            images[i, j, :, i:, j:] = image[:, :height-i, :width-j]
+    return images
 
-    return best_translation
 
-def best_translation(searched_image, found_image, prox_mask):
+def best_translation(searched_image, found_image, proximity_mask):
     input_channels, width, height = searched_image.size()
-    prox_idxs = prox_mask == 1
-    print('idxs', prox_idxs)
+
+    non_prox_idxs = proximity_mask != 1
 
     block_width, block_height = width // SPATIAL_RESOLUTION, height // SPATIAL_RESOLUTION
     assert searched_image.size() == found_image.size()
-    print(torch.stack([torch.stack([(searched_image[:, i:i+block_height, j:j+block_width] - found_image[:, width-i-block_height:width-i, height-j-block_width:height-j]).pow(2).mean() for i in range(block_height)]) for j in range(block_width)]).argmin())
+
+    translations = build_translated(found_image, block_height, block_width)
+
+    found_image[non_prox_idxs] = 0
+    translations[:, :, non_prox_idxs] = 0
+
+    mse = _mse(searched_image, translations)
+
+    return min(product(range(5), repeat=2), key=lambda t: mse[t])
 
 
 if __name__ == '__main__':
     from torchvision import transforms, utils as vutils
     from PIL import Image
 
-    mask = Image.open('input1_mask.jpg')
+    mask = Image.open('masking/input1_mask.jpg')
 
     preprocess = transforms.Compose([
         transforms.Resize([128, 128]),
@@ -79,15 +94,9 @@ if __name__ == '__main__':
 
     get_prox = get_prox_op((3, 128, 128))
     limit = get_prox(torch.stack([mask_tensor], 0))
-    vutils.save_image(limit, 'limit.jpg')
-    
-    from gist import get_masked_areas
+    vutils.save_image(limit, 'masking/limit.jpg')
 
-    print(get_masked_areas(mask_tensor))
-    print(best_translation(mask_tensor, mask_tensor, limit))
-    t = torch.Tensor([0, 1, 0, 0])
-    print(t == 0)
+    fake_image = torch.Tensor([[[i + j + k for j in range(20)] for i in range(20)] for k in range(3)])
 
-    print(t)
-    n = 2
-    print(list(product(range(- n, n + 1), repeat=2)))
+
+    print(best_translation(fake_image, fake_image + 5, torch.Tensor([[[i + j > 5 for j in range(20)] for i in range(20)] for k in range(3)])))
