@@ -70,9 +70,12 @@ def build_translated(image, max_i, max_j):
     return images
 
 
-def best_translation(searched_image, found_image, proximity_mask, image_transform=None):
+def best_translation(searched_image, found_image, proximity_mask, image_transform=None, punition=None):
     if image_transform is None:
         image_transform = lambda x: x
+
+    if punition is None:
+        punition = lambda i, j: 0
 
     input_channels, width, height = searched_image.size()
 
@@ -87,7 +90,7 @@ def best_translation(searched_image, found_image, proximity_mask, image_transfor
         proximity_mask
     )
 
-    min_i, min_j = min(product(range(5), repeat=2), key=lambda t: mse[t])
+    min_i, min_j = min(product(range(5), repeat=2), key=lambda coo: mse[coo] + punition(*coo))
     return translations[min_i, min_j], (min_i, min_j)
 
 def dumb_seamcut(orig_scene, mask, match):
@@ -116,6 +119,11 @@ if __name__ == '__main__':
     vutils.save_image(limit, 'masking/limit.jpg')
 
     fake_image = torch.Tensor([[[i + j + k for j in range(20)] for i in range(20)] for k in range(3)])
+    found_image = fake_image + 5
+
+    fake_image = fake_image / fake_image.max()
+    found_image = found_image / found_image.max()
+
     fake_mask = torch.Tensor([[[i + j > 5 for j in range(20)] for i in range(20)] for k in range(3)])
 
     best_image, (mi, mj) = best_translation(fake_image, fake_image + 5, fake_mask)
@@ -127,5 +135,11 @@ if __name__ == '__main__':
 
     from gist import build_gabor_conv
 
-    print(best_translation(fake_image, fake_image + 5, fake_mask, build_gabor_conv(fake_image.size())))
-    
+    best, (mi, mj) = best_translation(
+        fake_image,
+        fake_image + 5,
+        fake_mask,
+        image_transform=build_gabor_conv(fake_image.size()),
+        punition=lambda x, y: 50 * (x + y)
+    )
+    print(mi, mj)
