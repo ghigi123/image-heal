@@ -80,6 +80,7 @@ def best_translation(searched_image, found_image, proximity_mask, image_transfor
     input_channels, width, height = searched_image.size()
 
     block_width, block_height = width // SPATIAL_RESOLUTION, height // SPATIAL_RESOLUTION
+    print(searched_image.size(), found_image.size())
     assert searched_image.size() == found_image.size()
 
     translations = build_translated(found_image, block_height, block_width)
@@ -115,6 +116,7 @@ if __name__ == '__main__':
     mask_tensor = preprocess(mask)
 
     get_prox = get_prox_op((3, 128, 128))
+
     limit = get_prox(torch.stack([mask_tensor], 0))
     vutils.save_image(limit, 'masking/limit.jpg')
 
@@ -126,20 +128,20 @@ if __name__ == '__main__':
 
     fake_mask = torch.Tensor([[[i + j > 5 for j in range(20)] for i in range(20)] for k in range(3)])
 
-    best_image, (mi, mj) = best_translation(fake_image, fake_image + 5, fake_mask)
+    best_image, (mi, mj) = best_translation(fake_image, found_image, fake_mask)
 
     print(best_image)
 
-    print(dumb_seamcut(fake_image, fake_mask, fake_image))
+    print(dumb_seamcut(fake_image, best_image, fake_image))
     print(mi, mj)
 
     from gist import build_gabor_conv
 
     best, (mi, mj) = best_translation(
         fake_image,
-        fake_image + 5,
+        found_image,
         fake_mask,
         image_transform=build_gabor_conv(fake_image.size()),
-        punition=lambda x, y: 50 * (x + y)
+        punition=lambda x, y: 5 * (x + y)
     )
     print(mi, mj)
