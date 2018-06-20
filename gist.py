@@ -19,11 +19,8 @@ def get_masked_areas(mask, masked_ratio=0.3):
                 masked_areas.append((i, j))
     return masked_areas
 
-def build_gist(image_size, scales=(.81, .90, 1), orientations=8, kernel_size=None):
+def build_gabor_conv(image_size, scales=(.81, .90, 1), orientations=8, kernel_size=None):
     input_channels, height, width = image_size
-
-    if width % SPATIAL_RESOLUTION !=0 or height % SPATIAL_RESOLUTION != 0:
-        raise ValueError(f'Image width or height are not divisible by {SPATIAL_RESOLUTION}.')
 
     gabor_filters = [gabor_kernel(scale, orientation / orientations * np.pi).real
                      for scale in scales
@@ -40,9 +37,9 @@ def build_gist(image_size, scales=(.81, .90, 1), orientations=8, kernel_size=Non
 
     kernels = np.stack([kernels[:] for _ in range(input_channels)], axis=1)
 
-    gist_conv = nn.Conv2d(input_channels, kernels.shape[0] * kernels.shape[1], (kernel_size, kernel_size), groups=1, bias=False)
+    gabor_conv = nn.Conv2d(input_channels, kernels.shape[0] * kernels.shape[1], (kernel_size, kernel_size), groups=1, bias=False)
 
-    gist_conv.weight.data = torch.Tensor(kernels)
+    gabor_conv.weight.data = torch.Tensor(kernels)
 
     pad = (kernel_size - 1) // 2
     if (kernel_size - 1) % 2 == 0:
@@ -50,19 +47,35 @@ def build_gist(image_size, scales=(.81, .90, 1), orientations=8, kernel_size=Non
     else:
         padl, padr = pad, pad + 1
 
-    pooling_step = (width // SPATIAL_RESOLUTION, height // SPATIAL_RESOLUTION)
-
-    _gist = nn.Sequential(
+    padded_gabor_conv = nn.Sequential(
         nn.ReflectionPad2d((padl, padr, padl, padr)),
-        gist_conv,
-        nn.AvgPool2d(pooling_step, stride=pooling_step)
+        gabor_conv,
     )
 
-    def gist(tensor):
-        return _gist(tensor).view((tensor.size()[0], -1))
+    padded_gabor_conv.filters_number = len(gabor_filters)
+    padded_gabor_conv.features_number = len(gabor_filters) * SPATIAL_RESOLUTION ** 2
 
-    gist.filters_number = len(gabor_filters)
-    gist.features_number = len(gabor_filters) * SPATIAL_RESOLUTION ** 2
+    return padded_gabor_conv
+
+
+def build_gist(image_size, scales=(.81, .90, 1), orientations=8, kernel_size=None):
+    input_channels, height, width = image_size
+
+    if width % SPATIAL_RESOLUTION !=0 or height % SPATIAL_RESOLUTION != 0:
+        raise ValueError(f'Image width or height are not divisible by {SPATIAL_RESOLUTION}.')
+
+    pooling_step = (width // SPATIAL_RESOLUTION, height // SPATIAL_RESOLUTION)
+
+    _gabor_conv = build_gabor_conv(image_size, scales, orientations, kernel_size)
+
+    _pool_step = nn.AvgPool2d(pooling_step, stride=pooling_step)
+
+    def gist(tensor):
+        conv_output = _gabor_conv(tensor)
+        return _pool_step(conv_output).view((tensor.size()[0], -1))
+
+    gist.filters_number = _gabor_conv.filters_number
+    gist.features_number = _gabor_conv.features_number
 
     return gist
 
