@@ -30,8 +30,8 @@ def get_prox_op(image_size, kernel_size=25):
     )
 
     def get_prox(mask):
-        inverted_mask = 1 - mask
-        limit = _prox_conv_padded(inverted_mask)
+        inverted_mask = 1 - mask.unsqueeze(0)
+        limit = _prox_conv_padded(inverted_mask)[0]
         limit[limit <= threshold] = 0
         limit[limit > threshold] = 1
         return limit
