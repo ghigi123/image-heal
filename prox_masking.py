@@ -47,9 +47,9 @@ def mse_on_proximity(origin_image, translations, proximity_mask):
     searched_image = origin_image.clone()
     found_translations = translations.clone()
 
-    non_prox_idxs = proximity_mask != 1
-    searched_image[non_prox_idxs] = 0
-    found_translations[:, :, non_prox_idxs] = 0
+    non_prox_idxs = proximity_mask[0] != 1
+    searched_image[:, non_prox_idxs] = 0
+    found_translations[:, :, :, non_prox_idxs] = 0
 
     return _mse(searched_image, found_translations)
 
@@ -70,7 +70,10 @@ def build_translated(image, max_i, max_j):
     return images
 
 
-def best_translation(searched_image, found_image, proximity_mask):
+def best_translation(searched_image, found_image, proximity_mask, image_transform=None):
+    if image_transform is None:
+        image_transform = lambda x: x
+
     input_channels, width, height = searched_image.size()
 
     block_width, block_height = width // SPATIAL_RESOLUTION, height // SPATIAL_RESOLUTION
@@ -78,7 +81,11 @@ def best_translation(searched_image, found_image, proximity_mask):
 
     translations = build_translated(found_image, block_height, block_width)
 
-    mse = mse_on_proximity(searched_image, translations, proximity_mask)
+    mse = mse_on_proximity(
+        image_transform(searched_image.unsqueeze(0))[0],
+        image_transform(translations.view(-1, *searched_image.size())).view(*translations.size()[:2], -1, *translations.size()[3:]),
+        proximity_mask
+    )
 
     min_i, min_j = min(product(range(5), repeat=2), key=lambda t: mse[t])
     return translations[min_i, min_j], (min_i, min_j)
@@ -116,3 +123,9 @@ if __name__ == '__main__':
     print(best_image)
 
     print(dumb_seamcut(fake_image, fake_mask, fake_image))
+    print(mi, mj)
+
+    from gist import build_gabor_conv
+
+    print(best_translation(fake_image, fake_image + 5, fake_mask, build_gabor_conv(fake_image.size())))
+    
