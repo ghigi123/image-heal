@@ -80,7 +80,7 @@ def best_translation(searched_image, found_image, proximity_mask, image_transfor
     input_channels, width, height = searched_image.size()
 
     block_width, block_height = width // SPATIAL_RESOLUTION, height // SPATIAL_RESOLUTION
-    print(searched_image.size(), found_image.size())
+
     assert searched_image.size() == found_image.size()
 
     translations = build_translated(found_image, block_height, block_width)

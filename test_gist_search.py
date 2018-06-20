@@ -8,7 +8,7 @@ from vector_store import VectorWriter, VectorReader
 import random as rd
 from struct import pack
 from shutil import copyfile
-from prox_masking import best_translation, get_prox_op
+from prox_masking import best_translation, get_prox_op, dumb_seamcut
 
 
 def build_descriptor_database(data, descriptor, descriptor_size, filename):
@@ -98,7 +98,9 @@ if __name__ == '__main__':
                         punition=lambda x,y: 5 * (x + y)
                     )
 
-                    print(mi, mj)
+                    patched_image = dumb_seamcut(searched_image[0], mask, best_t)
+
+                    print(patched_image)
 
 
         if args.lsh:
