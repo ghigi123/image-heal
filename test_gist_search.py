@@ -89,18 +89,23 @@ if __name__ == '__main__':
                 gabor_conv = build_gabor_conv(im_size)
                 prox_mask = get_prox_mask(mask)
 
+
+                patched_images = []
+
                 for found_image in found_images:
                     best_t, (mi, mj) = best_translation(
                         searched_image[0],
                         found_image,
                         prox_mask,
                         image_transform=gabor_conv,
-                        punition=lambda x,y: 5 * (x + y)
+                        punition=lambda x, y: 5 * (x + y)
                     )
 
-                    patched_image = dumb_seamcut(searched_image[0], mask, best_t)
+                    patched_images.append(dumb_seamcut(searched_image[0], mask, best_t))
 
-                    print(patched_image)
+                vutils.save_image([searched_image[0]] + patched_images,
+                                '%s/%s_test_naive_patched.png' % (args.output_dir, i),
+                                normalize=True)
 
 
         if args.lsh:
