@@ -67,14 +67,15 @@ if __name__ == '__main__':
                 searched_image_idx = rd.randint(int(len(vr) * 0.8), len(vr) - 1)
                 searched_image = dataset.images[searched_image_idx]
                 mask = torch.ones(searched_image.size()[1:])
-                mask[:, :im_size[1] // 4, :] = 0
-                assert get_masked_areas(mask) == [(0, 0), (0, 1), (0, 2), (0, 3)]
+                mask[:, :im_size[1] // 5, :im_size[1] // 5] = 0
+
+                assert get_masked_areas(mask) == [(0, 0)]
 
                 found_image_idxs = search(searched_image, blanks=get_masked_areas(mask))
                 found_images = dataset.images[found_image_idxs[:23]]
                 paths = dataset.paths[[searched_image_idx] + list(found_image_idxs[:40])]
 
-                # vutils.save_image(mask, 'default_mask.jpg')
+                vutils.save_image(mask, 'default_mask.jpg')
                 # for i, path in enumerate(paths):
                 #     fn = os.path.split(path)[-1]
                 #     copyfile(path, os.path.join('./out/ex/', f'{i}_{fn}'))

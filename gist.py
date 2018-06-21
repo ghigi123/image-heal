@@ -5,7 +5,7 @@ import numpy as np
 
 SPATIAL_RESOLUTION = 4
 
-def get_masked_areas(mask, masked_ratio=0.3):
+def get_masked_areas(mask, masked_ratio=0.5):
     input_channels, height, width = mask.size()
     w_step, h_step = width // SPATIAL_RESOLUTION, height // SPATIAL_RESOLUTION
     area_pixels_threshold = input_channels * w_step * h_step * masked_ratio
