@@ -94,13 +94,12 @@ def best_translation(searched_image, found_image, proximity_mask, image_transfor
     min_i, min_j = min(product(range(5), repeat=2), key=lambda coo: mse[coo] + punition(*coo))
     return translations[min_i, min_j], (min_i, min_j)
 
+
 def dumb_seamcut(orig_scene, mask, match):
     patched_scene = orig_scene.clone()
-    patched_scene[mask == 0] = 0
-    print(patched_scene)
-    print('=' * 77)
     patched_scene[mask == 0] = match[mask == 0]
     return patched_scene
+
 
 if __name__ == '__main__':
     from torchvision import transforms, utils as vutils
