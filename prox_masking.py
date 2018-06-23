@@ -83,7 +83,7 @@ def best_translation(searched_image, found_image, proximity_mask, image_transfor
 
     assert searched_image.size() == found_image.size()
 
-    translations = build_translated(found_image, block_height, block_width)
+    translations = build_translated(found_image, block_height // 4, block_width // 4)
 
     mse = mse_on_proximity(
         image_transform(searched_image.unsqueeze(0))[0],
@@ -91,7 +91,7 @@ def best_translation(searched_image, found_image, proximity_mask, image_transfor
         proximity_mask
     )
 
-    min_i, min_j = min(product(range(5), repeat=2), key=lambda coo: mse[coo] + punition(*coo))
+    min_i, min_j = min(product(range(block_height // 4), repeat=2), key=lambda coo: mse[coo] + punition(*coo))
     return translations[min_i, min_j], (min_i, min_j)
 
 
