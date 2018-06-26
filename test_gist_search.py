@@ -7,7 +7,6 @@ import torchvision.utils as vutils
 from vector_store import VectorWriter, VectorReader
 import random as rd
 from struct import pack
-from shutil import copyfile
 from prox_masking import best_translation, get_prox_op, dumb_seamcut
 from img_grad import compute_image_grad
 import heapq
@@ -85,9 +84,6 @@ if __name__ == '__main__':
                 paths = dataset.paths[[searched_image_idx] + list(found_image_idxs[:40])]
 
                 vutils.save_image(mask, 'default_mask.jpg')
-                # for i, path in enumerate(paths):
-                #     fn = os.path.split(path)[-1]
-                #     copyfile(path, os.path.join('./out/ex/', f'{i}_{fn}'))
 
                 print('Searching nearest', time() - t0)
 
@@ -107,7 +103,8 @@ if __name__ == '__main__':
                         found_image,
                         prox_mask,
                         image_transform=gabor_conv,
-                        punition=lambda x, y: 5 * (x + y)
+                        punition=lambda x, y: 5 * (x + y),
+                        result_scoring=lambda image: int(compute_image_grad(dumb_seamcut(searched_image[0], mask, image)))
                     )
 
                     patched = dumb_seamcut(searched_image[0], mask, best_t)
@@ -118,36 +115,3 @@ if __name__ == '__main__':
                 vutils.save_image([searched_image[0]] + top23,
                                 '%s/%s_test_naive_patched.png' % (args.output_dir, i),
                                 normalize=True)
-
-
-        if args.lsh:
-            print('Building LSH')
-            t0 = time()
-            lsh = datasketch.MinHashLSH(num_perm=128, threshold=1)
-
-            for i, vector_hash in enumerate(vr.hashes()):
-                m = datasketch.MinHash(num_perm=128)
-                m.update(vector_hash)
-                lsh.insert(i, m)
-                if i > len(vr) * 0.8:
-                    break
-
-            print('Building LSH Forest took', time() - t0)
-            print('LSH search')
-            for i in range(20):
-                t0 = time()
-
-                searched_image_idx = rd.randint(int(len(vr) * 0.8), len(vr) - 1)
-                new_image = dataset.images[searched_image_idx]
-                m = datasketch.MinHash(num_perm=128)
-                m.update(pack(f'{vr._vector_size}f', *gist(new_image)[0]))
-                found_image_idxs = lsh.query(m)
-
-                print('Searching nearest', time() - t0)
-
-                print(searched_image_idx)
-                print(found_image_idxs)
-
-                vutils.save_image(torch.stack(new_image + [dataset[idx][0] for idx in found_image_idxs[:23]], 0),
-                                    '%s/%s_test_lsh.png' % (args.output_dir, i),
-                                  normalize=True)

@@ -70,20 +70,25 @@ def build_translated(image, max_i, max_j):
     return images
 
 
-def best_translation(searched_image, found_image, proximity_mask, image_transform=None, punition=None):
+def best_translation(searched_image, found_image, proximity_mask, image_transform=None, punition=None, result_scoring=None):
     if image_transform is None:
         image_transform = lambda x: x
 
     if punition is None:
         punition = lambda i, j: 0
 
+    if result_scoring is None:
+        result_scoring = lambda image: 0
+
+
     input_channels, width, height = searched_image.size()
 
     block_width, block_height = width // SPATIAL_RESOLUTION, height // SPATIAL_RESOLUTION
+    width_range, height_range = block_width // 4, block_height // 4
 
     assert searched_image.size() == found_image.size()
 
-    translations = build_translated(found_image, block_height // 4, block_width // 4)
+    translations = build_translated(found_image, height_range, width_range)
 
     mse = mse_on_proximity(
         image_transform(searched_image.unsqueeze(0))[0],
@@ -91,7 +96,7 @@ def best_translation(searched_image, found_image, proximity_mask, image_transfor
         proximity_mask
     )
 
-    min_i, min_j = min(product(range(block_height // 4), repeat=2), key=lambda coo: mse[coo] + punition(*coo))
+    min_i, min_j = min(((i, j) for i in range(height_range) for j in range(width_range)), key=lambda coo: mse[coo] + punition(*coo) + result_scoring(translations[coo]))
     return translations[min_i, min_j], (min_i, min_j)
 
 
