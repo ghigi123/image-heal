@@ -6,7 +6,6 @@ import os
 import torchvision.utils as vutils
 from vector_store import VectorWriter, VectorReader
 import random as rd
-from struct import pack
 from prox_masking import best_translation, get_prox_op, dumb_seamcut
 from img_grad import compute_image_grad
 import heapq
@@ -67,51 +66,51 @@ if __name__ == '__main__':
 
         print('Building gists', time() - t0)
 
-        if args.naive:
-            print('Naive search')
-            for i in range(20):
-                t0 = time()
+        
+        print('Naive search')
+        for i in range(20):
+            t0 = time()
 
-                searched_image_idx = rd.randint(int(len(vr) * 0.8), len(vr) - 1)
-                searched_image = dataset.images[searched_image_idx]
-                mask = torch.ones(searched_image.size()[1:])
-                mask[:, :im_size[1] // 5, :im_size[1] // 2] = 0
+            searched_image_idx = rd.randint(int(len(vr) * 0.8), len(vr) - 1)
+            searched_image = dataset.images[searched_image_idx]
+            mask = torch.ones(searched_image.size()[1:])
+            mask[:, :im_size[1] // 5, :im_size[1] // 2] = 0
 
-                assert get_masked_areas(mask) == [(0, 0), (0, 1)]
+            assert get_masked_areas(mask) == [(0, 0), (0, 1)]
 
-                found_image_idxs = search(searched_image, blanks=get_masked_areas(mask))
-                found_images = dataset.images[found_image_idxs]
-                paths = dataset.paths[[searched_image_idx] + list(found_image_idxs[:40])]
+            found_image_idxs = search(searched_image, blanks=get_masked_areas(mask))
+            found_images = dataset.images[found_image_idxs]
+            paths = dataset.paths[[searched_image_idx] + list(found_image_idxs[:40])]
 
-                vutils.save_image(mask, 'default_mask.jpg')
+            vutils.save_image(mask, 'default_mask.jpg')
 
-                print('Searching nearest', time() - t0)
+            print('Searching nearest', time() - t0)
 
-                vutils.save_image(torch.cat([searched_image, found_images[:23]], dim=0),
-                                '%s/%s_test_naive.png' % (args.output_dir, i),
-                                normalize=True)
+            vutils.save_image(torch.cat([searched_image, found_images[:23]], dim=0),
+                            '%s/%s_test_naive.png' % (args.output_dir, i),
+                            normalize=True)
 
-                get_prox_mask = get_prox_op(im_size)
-                gabor_conv = build_gabor_conv(im_size)
-                prox_mask = get_prox_mask(mask)
+            get_prox_mask = get_prox_op(im_size)
+            gabor_conv = build_gabor_conv(im_size)
+            prox_mask = get_prox_mask(mask)
 
-                patched_images = []
+            patched_images = []
 
-                for found_image in load_bar(found_images):
-                    best_t, (mi, mj) = best_translation(
-                        searched_image[0],
-                        found_image,
-                        prox_mask,
-                        image_transform=gabor_conv,
-                        punition=lambda x, y: 5 * (x + y),
-                        result_scoring=lambda image: int(compute_image_grad(dumb_seamcut(searched_image[0], mask, image)))
-                    )
+            for found_image in load_bar(found_images):
+                best_t, (mi, mj) = best_translation(
+                    searched_image[0],
+                    found_image,
+                    prox_mask,
+                    image_transform=gabor_conv,
+                    punition=lambda x, y: 5 * (x + y),
+                    result_scoring=lambda image: int(compute_image_grad(dumb_seamcut(searched_image[0], mask, image)))
+                )
 
-                    patched = dumb_seamcut(searched_image[0], mask, best_t)
-                    patched_images.append(patched)
+                patched = dumb_seamcut(searched_image[0], mask, best_t)
+                patched_images.append(patched)
 
-                top23 = heapq.nlargest(23, patched_images, key=lambda image: compute_image_grad(image))
+            top23 = heapq.nlargest(23, patched_images, key=lambda image: compute_image_grad(image))
 
-                vutils.save_image([searched_image[0]] + top23,
-                                '%s/%s_test_naive_patched.png' % (args.output_dir, i),
-                                normalize=True)
+            vutils.save_image([searched_image[0]] + top23,
+                            '%s/%s_test_naive_patched.png' % (args.output_dir, i),
+                            normalize=True)

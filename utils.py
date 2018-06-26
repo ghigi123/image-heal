@@ -41,12 +41,6 @@ def parse_args():
     parser.add_argument('--discriminator-model-name', default='discriminator')
     parser.add_argument('--generator-model-name', default = 'generator')
     parser.add_argument('--mask-size', type=int, default = 32, help="size of the mask used for inpainting")
-    parser.add_argument('--naive', dest='naive', action='store_true')
-    parser.add_argument('--no-naive', dest='naive', action='store_false')
-    parser.set_defaults(naive=True)
-    parser.add_argument('--lsh', dest='lsh', action='store_true')
-    parser.add_argument('--no-lsh', dest='lsh', action='store_false')
-    parser.set_defaults(lsh=True)
 
     args = parser.parse_args()
 
