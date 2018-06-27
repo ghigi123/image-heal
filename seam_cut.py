@@ -94,16 +94,6 @@ def create_seam_cut(orig_scene, mask_scene, match_scene):
     diff_fill = cv2.threshold(diff_fill, 5, 255, cv2.THRESH_BINARY)[1]
     return np2to3(diff_fill)
 
-def create_seam_cut(orig_scene, mask_scene, match_scene):
-    _, height, width = orig_scene.shape
-
-    mask_info = np.where(mask_scene == 0)
-    min_x, max_x, min_y, max_y = min(mask_info[1]), max(mask_info[1]), min(mask_info[2]), max(mask_info[2])
-
-    match_scene = match_scene[min_x:max_x, min_y:max_y]
-
-    return cv2.seamlessClone(match_scene.numpy(), orig_scene.numpy(), mask_scene.numpy(), (min_x + (max_x - min_x) // 2, min_y + (max_y - min_y) // 2), cv2.NORMAL_CLONE)
-
 if __name__ == '__main__':
     import torch
     fake_image = torch.Tensor([[[i + j + k for j in range(20)] for i in range(20)] for k in range(3)])
