@@ -83,3 +83,7 @@ Approche DCGAN :
 Approche context encoder :
 
 * http://people.eecs.berkeley.edu/~pathak/context_encoder/
+
+Approche vision :
+
+* http://graphics.cs.cmu.edu/projects/scene-completion/
