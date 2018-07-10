@@ -41,6 +41,7 @@ def parse_args():
     parser.add_argument('--discriminator-model-name', default='discriminator')
     parser.add_argument('--generator-model-name', default = 'generator')
     parser.add_argument('--mask-size', type=int, default = 32, help="size of the mask used for inpainting")
+    parser.add_argument('--mask-type', type=str, default='auto', help="type of mask to use")
 
     args = parser.parse_args()
 

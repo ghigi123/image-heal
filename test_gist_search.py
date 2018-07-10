@@ -6,10 +6,11 @@ import os
 import torchvision.utils as vutils
 from vector_store import VectorWriter, VectorReader
 import random as rd
-from prox_masking import best_translation, get_prox_op, dumb_seamcut
+from prox_masking import best_translation, get_prox_op, dumb_seamcut, blending_seamcut
 from img_grad import compute_image_grad
 import heapq
-
+from segmentation import segment_quickshift, show
+import numpy as np
 
 def load_bar(it, load_bar_size=30, total=None):
     if total is None:
@@ -34,31 +35,27 @@ def load_bar(it, load_bar_size=30, total=None):
     print('\r')
 
 
-def build_descriptor_database(data, descriptor, descriptor_size, filename):
+def build_descriptor_database(data, n_iterations, descriptor, descriptor_size, filename):
+    print('Start building db')
     with VectorWriter(filename, descriptor_size) as vw:
-        k = 0
-        for batch_paths, batch_imgs in data:
-            k += 1
+        print('VectorWriter Initiated')
+        for batch_paths, batch_imgs in load_bar(data, total=n_iterations):
             vw.write_batch(descriptor(batch_imgs), batch_paths)
-            if k % 5 == 0:
-                print(f'\r{k}', end='')
-        print(f'\r', end='')
 
 
 if __name__ == '__main__':
     last_dataset_idx = 10000
-    ratio_of_known_images = 0.8
+    ratio_of_known_images = 0.95
     args = parse_args()
     im_size = 3, args.image_size, args.image_size
 
-    gist = build_gist(im_size)
+    gist = build_gist(im_size, scales=(0.5, 0.81, 0.90, 1))
     get_prox_mask = get_prox_op(im_size)
     gabor_conv = build_gabor_conv(im_size)
 
+    print('Loading Images')
     t0 = time()
     dataset, train_loader, test_loader = dataset_loaders(args)
-
-    paths, imgs = next(dataset.batches(500))
 
     print('Loading images', time() - t0)
     t0 = time()
@@ -67,7 +64,8 @@ if __name__ == '__main__':
     print(filename)
 
     if not os.path.exists(f'{filename}.db.binary'):
-        build_descriptor_database(dataset.batches(100), gist, gist.features_number, filename)
+        n_batch = 50
+        build_descriptor_database(dataset.batches(n_batch), len(dataset) // n_batch, gist, gist.features_number, filename)
     else:
         print('Not computing gist db')
 
@@ -94,10 +92,27 @@ if __name__ == '__main__':
             searched_image_idx = rd.randint(int(len(vr) * ratio_of_known_images), len(vr) - 1)
             searched_image = dataset.images[searched_image_idx]
 
-            mask = torch.ones(searched_image.size()[1:])
-            mask[:, :im_size[1] // 5, :im_size[1] // 2] = 0
+            if args.mask_type == 'center':
+                mask = torch.ones(searched_image.size()[1:])
+                chan, height, width = searched_image.size()[1:]
+                cx, cy = height // 2, width // 2
+                dx, dy = height // 6, width // 6
 
-            assert get_masked_areas(mask) == [(0, 0), (0, 1)]
+                mask[:, cx - dx: cx + dx, cy - dy: cy + dy] = 0
+
+            elif args.mask_type == 'auto':
+                segmentation = torch.Tensor(segment_quickshift(searched_image[0]))
+                top_segmentation_labels = dict(zip(*np.unique(segmentation, return_counts=True)))
+                sorted_labels = sorted(top_segmentation_labels, key=lambda key: top_segmentation_labels[key],
+                                       reverse=True)
+                chosen_label = sorted_labels[2] if len(sorted_labels) > 2 else sorted_labels[-1]
+
+                segmented = (segmentation != float(chosen_label)).type(torch.FloatTensor).repeat(3, 1, 1)
+                mask = segmented
+            else:
+                raise ValueError(f'mask_type {args.mask_type} is not valid (Available : center, auto)')
+
+            print('Masked area', get_masked_areas(mask))
 
             found_image_idxs = search(searched_image, blanks=get_masked_areas(mask))
             found_images = dataset.images[found_image_idxs]
@@ -113,6 +128,8 @@ if __name__ == '__main__':
 
 
             prox_mask = get_prox_mask(mask)
+            blending_mask = prox_mask + 1 - mask
+            vutils.save_image(blending_mask, 'blending_mask.jpg')
 
             patched_images = []
 
@@ -124,17 +141,17 @@ if __name__ == '__main__':
                     found_image,
                     prox_mask,
                     image_transform=gabor_conv,
-                    punition=lambda x, y: 5 * (x + y),
-                    result_scoring=lambda image: int(compute_image_grad(dumb_seamcut(searched_image[0], mask, image)))
+                    punition=lambda x, y: 3 * (x + y),
+                    result_scoring=lambda image: float(compute_image_grad(blending_seamcut(searched_image[0], blending_mask, image)))
                 )
 
-                patched = dumb_seamcut(searched_image[0], mask, best_t)
+                patched = blending_seamcut(searched_image[0], blending_mask, best_t)
                 patched_images.append(patched)
 
-            top23 = heapq.nlargest(23, patched_images, key=lambda image: compute_image_grad(image))
+            top22 = heapq.nlargest(22, patched_images, key=lambda image: compute_image_grad(image))
 
             print('Computing best patched images', time() - t0)
 
-            vutils.save_image([searched_image[0]] + top23,
+            vutils.save_image([searched_image[0], mask] + top22,
                             '%s/%s_test_naive_patched.png' % (args.output_dir, i),
                             normalize=True)

@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from itertools import product
 SPATIAL_RESOLUTION = 4
 
 
@@ -39,6 +38,45 @@ def get_prox_op(image_size, kernel_size=25):
     return get_prox
 
 
+def get_prox_op(image_size, kernel_size=25):
+    input_channels, width, height = image_size
+
+    kernel = torch.ones((input_channels, input_channels, kernel_size, kernel_size))
+    n_tiles = kernel_size ** 2
+    kernel[:, :, (kernel_size - 1) // 2, (kernel_size - 1) // 2] = - n_tiles
+    max_value = (n_tiles - 1) * input_channels / 2  # half of the kernel is full
+
+    pad = (kernel_size - 1) // 2
+    if (kernel_size - 1) % 2 == 0:
+        padl, padr = pad, pad
+    else:
+        padl, padr = pad, pad + 1
+
+    _prox_conv = nn.Conv2d(input_channels, input_channels, kernel_size, groups=1,
+                              bias=False)
+
+    _prox_conv.weight.data = kernel
+    _prox_conv.weight.requires_grad = False
+
+    threshold = kernel_size / 5
+
+    _prox_conv_padded = nn.Sequential(
+        nn.ReflectionPad2d((padl, padr, padl, padr)),
+        _prox_conv
+    )
+
+    def get_prox(mask):
+        inverted_mask = 1 - mask.unsqueeze(0)
+        limit = _prox_conv_padded(inverted_mask)[0]
+        limit[limit <= threshold] = 0
+        limit[limit > threshold] /= max_value
+        limit[limit > 1] = 1
+        return limit
+
+    return get_prox
+
+
+
 def _mse(searched_image, found_translations):
     return (searched_image - found_translations).pow(2).sum(2).sum(2).sum(2)
 
@@ -52,6 +90,7 @@ def mse_on_proximity(origin_image, translations, proximity_mask):
     found_translations[:, :, :, non_prox_idxs] = 0
 
     return _mse(searched_image, found_translations)
+
 
 def build_translated(image, max_i, max_j):
     chan, height, width = image.size()
@@ -104,6 +143,10 @@ def dumb_seamcut(orig_scene, mask, match):
     patched_scene = orig_scene.clone()
     patched_scene[mask == 0] = match[mask == 0]
     return patched_scene
+
+
+def blending_seamcut(orig_scene, blending_mask, match):
+    return orig_scene + (match - orig_scene) * blending_mask
 
 
 if __name__ == '__main__':
