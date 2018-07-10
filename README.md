@@ -46,8 +46,8 @@ optional arguments:
   --method METHOD       which method to use (context-encoder or dcgan)
   --discriminator-model-name DISCRIMINATOR_MODEL_NAME
   --generator-model-name GENERATOR_MODEL_NAME
-  --mask-size MASK_SIZE
-                        size of the mask used for inpainting
+  --mask-size MASK_SIZE size of the mask used for inpainting
+  --mask-type mask+type type of mask used for local/global context matching. Available : center, auto (quickshift)
 ```
 
 Exemple d'usage :
@@ -67,6 +67,12 @@ L'idée de ce fichier est essentiellement de tester différentes architectures d
 ```
 python train_autoencoder.py
 ```
+
+### Test local/global context matching with gist
+```
+python use_gist_search.py --data-path {path/to/data : data/unlabeled/_resized} --mask-type auto
+```
+
 
 ## Auteurs
 
