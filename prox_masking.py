@@ -2,42 +2,6 @@ import torch
 from torch import nn
 SPATIAL_RESOLUTION = 4
 
-
-def get_prox_op(image_size, kernel_size=25):
-    input_channels, width, height = image_size
-
-    kernel = torch.ones((input_channels, input_channels, kernel_size, kernel_size))
-    kernel[:, :, (kernel_size - 1) // 2, (kernel_size - 1) // 2] = - kernel_size ** 2
-
-    pad = (kernel_size - 1) // 2
-    if (kernel_size - 1) % 2 == 0:
-        padl, padr = pad, pad
-    else:
-        padl, padr = pad, pad + 1
-
-    _prox_conv = nn.Conv2d(input_channels, input_channels, kernel_size, groups=1,
-                              bias=False)
-
-    _prox_conv.weight.data = kernel
-    _prox_conv.weight.requires_grad = False
-
-    threshold = kernel_size / 5
-
-    _prox_conv_padded = nn.Sequential(
-        nn.ReflectionPad2d((padl, padr, padl, padr)),
-        _prox_conv
-    )
-
-    def get_prox(mask):
-        inverted_mask = 1 - mask.unsqueeze(0)
-        limit = _prox_conv_padded(inverted_mask)[0]
-        limit[limit <= threshold] = 0
-        limit[limit > threshold] = 1
-        return limit
-
-    return get_prox
-
-
 def get_prox_op(image_size, kernel_size=25):
     input_channels, width, height = image_size
 
